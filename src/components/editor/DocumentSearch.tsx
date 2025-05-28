@@ -1,27 +1,24 @@
-'use client'
+"use client"
 
-import { useState, useEffect, useCallback } from 'react'
-import { Editor } from '@tiptap/react'
+import { useState, useEffect, useCallback } from "react"
+import { Editor } from "@tiptap/react"
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Button } from '@/components/ui/button'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Badge } from '@/components/ui/badge'
-import {
-  Search, FileText, Clock,
-  Loader2,
-} from 'lucide-react'
-import { SearchResult } from '@/lib/search/document-search'
-import { ClientSearchService } from '@/lib/search/client-search'
-import { useDebounce } from '@/lib/hooks/use-debounce'
-import { formatDistanceToNow } from 'date-fns'
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Badge } from "@/components/ui/badge"
+import { Search, FileText, Clock, Loader2 } from "lucide-react"
+import { SearchResult } from "@/lib/search/document-search"
+import { ClientSearchService } from "@/lib/search/client-search"
+import { useDebounce } from "@/lib/hooks/use-debounce"
+import { formatDistanceToNow } from "date-fns"
 
 interface DocumentSearchProps {
   open: boolean
@@ -32,92 +29,91 @@ interface DocumentSearchProps {
 // Create search service instance outside component to prevent recreation
 const searchService = new ClientSearchService()
 
-export function DocumentSearch({
-  open,
-  onOpenChange,
-  editor,
-}: DocumentSearchProps) {
-  const [query, setQuery] = useState('')
+export function DocumentSearch({ open, onOpenChange, editor }: DocumentSearchProps) {
+  const [query, setQuery] = useState("")
   const [results, setResults] = useState<SearchResult[]>([])
   const [recentSearches, setRecentSearches] = useState<string[]>([])
   const [isSearching, setIsSearching] = useState(false)
   const [selectedResult, setSelectedResult] = useState<SearchResult | null>(null)
-  const [searchType, setSearchType] = useState<'all' | 'semantic' | 'keyword'>('all')
+  const [searchType, setSearchType] = useState<"all" | "semantic" | "keyword">("all")
   const [hasAICapability, setHasAICapability] = useState(false)
 
   const debouncedQuery = useDebounce(query, 300)
 
   useEffect(() => {
     // Load recent searches from localStorage
-    const stored = localStorage.getItem('recent_searches')
+    const stored = localStorage.getItem("recent_searches")
     if (stored) {
       setRecentSearches(JSON.parse(stored))
     }
-    
+
     // Check AI capability from server
     const checkAI = async () => {
       const hasAI = await searchService.checkAICapability()
       setHasAICapability(hasAI)
-      
+
       // If no AI capability, default to keyword search
-      if (!hasAI && searchType !== 'keyword') {
-        setSearchType('keyword')
+      if (!hasAI && searchType !== "keyword") {
+        setSearchType("keyword")
       }
-      
-      console.log('AI capabilities available:', hasAI)
+
+      console.log("AI capabilities available:", hasAI)
       if (!hasAI) {
-        console.log('No AI API keys found - search will use keyword matching only')
+        console.log("No AI API keys found - search will use keyword matching only")
       }
     }
-    
+
     // Debug: Check if there are any documents in the store
     const checkDocuments = async () => {
       try {
-        const response = await fetch('/api/documents')
+        const response = await fetch("/api/documents")
         if (response.ok) {
           const data = await response.json()
-          console.log('Documents from document store:', data.documents.length)
-          console.log('Document stats:', data.stats)
+          console.log("Documents from document store:", data.documents.length)
+          console.log("Document stats:", data.stats)
         }
       } catch (error) {
-        console.error('Error checking documents:', error)
+        console.error("Error checking documents:", error)
       }
     }
-    
+
     checkAI()
     checkDocuments()
   }, [])
 
   const performSearch = useCallback(async () => {
-    console.log('performSearch called with query:', debouncedQuery)
-    
+    console.log("performSearch called with query:", debouncedQuery)
+
     if (!debouncedQuery.trim()) {
       setResults([])
       return
     }
 
     setIsSearching(true)
-    console.log('Starting search with type:', searchType)
-    
+    console.log("Starting search with type:", searchType)
+
     try {
-      console.log('Calling searchService.search with:', { query: debouncedQuery, options: { limit: 20, searchType: searchType === 'all' ? 'hybrid' : searchType } })
-      
+      console.log("Calling searchService.search with:", {
+        query: debouncedQuery,
+        options: { limit: 20, searchType: searchType === "all" ? "hybrid" : searchType },
+      })
+
       const searchResults = await searchService.search(debouncedQuery, {
         limit: 20,
-        searchType: searchType === 'all' ? 'hybrid' : searchType,
+        searchType: searchType === "all" ? "hybrid" : searchType,
       })
-      
-      console.log('Search results:', searchResults)
+
+      console.log("Search results:", searchResults)
       setResults(searchResults)
 
       // Update recent searches
-      setRecentSearches(prev => {
-        const updated = [debouncedQuery, ...prev.filter(s => s !== debouncedQuery)].slice(0, 5)
-        localStorage.setItem('recent_searches', JSON.stringify(updated))
+      setRecentSearches((prev) => {
+        const updated = [debouncedQuery, ...prev.filter((s) => s !== debouncedQuery)].slice(0, 5)
+        localStorage.setItem("recent_searches", JSON.stringify(updated))
         return updated
       })
     } catch (error) {
-      console.error('Search error in performSearch:', error)
+      console.error("Search error in performSearch:", error)
       // Set empty results on error so UI doesn't break
       setResults([])
     } finally {
@@ -126,14 +122,12 @@ export function DocumentSearch({
   }, [debouncedQuery, searchType])
 
   useEffect(() => {
-    // Only perform search if dialog is open and there's a query
-    if (open && debouncedQuery.trim()) {
+    if (query.trim()) {
       performSearch()
-    } else if (!debouncedQuery.trim()) {
-      // Clear results if query is empty
+    } else {
       setResults([])
     }
-  }, [performSearch, open, debouncedQuery])
+  }, [query, searchType, performSearch])
 
   const insertReference = (result: SearchResult) => {
     const reference = `[${result.title}](ref:${result.documentId})`
@@ -183,13 +177,16 @@ export function DocumentSearch({
 
               {/* Search Type Tabs */}
               <div className="space-y-2">
-                <Tabs value={searchType} onValueChange={(v) => setSearchType(v as 'all' | 'semantic' | 'keyword')}>
+                <Tabs
+                  value={searchType}
+                  onValueChange={(v) => setSearchType(v as "all" | "semantic" | "keyword")}
+                >
                   <TabsList className="grid w-full grid-cols-3">
                     <TabsTrigger value="all" disabled={!hasAICapability}>
-                      All {!hasAICapability && '(Keyword Only)'}
+                      All {!hasAICapability && "(Keyword Only)"}
                     </TabsTrigger>
                     <TabsTrigger value="semantic" disabled={!hasAICapability}>
-                      AI Semantic {!hasAICapability && '(Unavailable)'}
+                      AI Semantic {!hasAICapability && "(Unavailable)"}
                     </TabsTrigger>
                     <TabsTrigger value="keyword">Keyword</TabsTrigger>
                   </TabsList>
@@ -216,8 +213,8 @@ export function DocumentSearch({
                         onClick={() => setSelectedResult(result)}
                         className={`w-full text-left p-4 rounded-lg border transition-colors ${
                           selectedResult?.id === result.id
-                            ? 'border-primary bg-primary/5'
-                            : 'border-border hover:bg-muted/50'
+                            ? "border-primary bg-primary/5"
+                            : "border-border hover:bg-muted/50"
                         }`}
                       >
                         <div className="flex items-start justify-between gap-2">
@@ -293,19 +290,19 @@ export function DocumentSearch({
                   <div className="mt-4 space-y-2">
                     {selectedResult.metadata.fileType && (
                       <div className="text-sm">
-                        <span className="text-muted-foreground">Type:</span>{' '}
+                        <span className="text-muted-foreground">Type:</span>{" "}
                         {selectedResult.metadata.fileType}
                       </div>
                     )}
                     {selectedResult.metadata.wordCount && (
                       <div className="text-sm">
-                        <span className="text-muted-foreground">Words:</span>{' '}
+                        <span className="text-muted-foreground">Words:</span>{" "}
                         {selectedResult.metadata.wordCount}
                       </div>
                     )}
                     {selectedResult.metadata.processedAt && (
                       <div className="text-sm">
-                        <span className="text-muted-foreground">Added:</span>{' '}
+                        <span className="text-muted-foreground">Added:</span>{" "}
                         {formatDistanceToNow(new Date(selectedResult.metadata.processedAt))} ago
                       </div>
                     )}

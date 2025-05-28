@@ -1,7 +1,7 @@
-'use client'
+"use client"
 
-import { useState, useEffect } from 'react'
-import { Editor } from '@tiptap/react'
+import { useState, useEffect, useMemo } from "react"
+import { Editor } from "@tiptap/react"
 import {
   ContextMenu,
   ContextMenuContent,
@@ -11,35 +11,48 @@ import {
   ContextMenuSubContent,
   ContextMenuSubTrigger,
   ContextMenuTrigger,
-} from '@/components/ui/context-menu'
+} from "@/components/ui/context-menu"
 import {
-  Sparkles, Edit3, Expand, Minimize,
-  RefreshCw, Languages, CheckCircle,
-  FileText, Lightbulb, AlertCircle,
-} from 'lucide-react'
-import { AIEditDialog } from './AIEditDialog'
-import { AISelectionHandler } from '@/lib/editor/ai-selection'
+  Sparkles,
+  Edit3,
+  Expand,
+  Minimize,
+  RefreshCw,
+  Languages,
+  CheckCircle,
+  FileText,
+  Lightbulb,
+} from "lucide-react"
+import { AIEditDialog } from "./AIEditDialog"
+import { AISelectionHandler } from "@/lib/editor/ai-selection"
 
 interface AIContextMenuProps {
   editor: Editor
   children: React.ReactNode
 }
 
+interface Selection {
+  isEmpty: boolean
+  text: string
+  from: number
+  to: number
+}
+
 export function AIContextMenu({ editor, children }: AIContextMenuProps) {
   const [showEditDialog, setShowEditDialog] = useState(false)
-  const [selectedAction, setSelectedAction] = useState<string>('')
-  const [selection, setSelection] = useState<any>(null)
+  const [selectedAction, setSelectedAction] = useState<string>("")
+  const [selection, setSelection] = useState<Selection | null>(null)
 
-  const aiHandler = new AISelectionHandler(editor)
+  const aiHandler = useMemo(() => new AISelectionHandler(editor), [editor])
 
   useEffect(() => {
     const updateSelection = () => {
       setSelection(aiHandler.getSelection())
     }
 
-    editor.on('selectionUpdate', updateSelection)
+    editor.on("selectionUpdate", updateSelection)
     return () => {
-      editor.off('selectionUpdate', updateSelection)
+      editor.off("selectionUpdate", updateSelection)
     }
   }, [editor, aiHandler])
 
@@ -49,47 +62,40 @@ export function AIContextMenu({ editor, children }: AIContextMenuProps) {
   }
 
   const quickActions = [
-    { id: 'improve', label: 'Improve Writing', icon: Sparkles },
-    { id: 'fix', label: 'Fix Grammar', icon: CheckCircle },
-    { id: 'simplify', label: 'Simplify', icon: FileText },
-    { id: 'expand', label: 'Make Longer', icon: Expand },
-    { id: 'shorten', label: 'Make Shorter', icon: Minimize },
-    { id: 'summarize', label: 'Summarize', icon: Lightbulb },
+    { id: "improve", label: "Improve Writing", icon: Sparkles },
+    { id: "fix", label: "Fix Grammar", icon: CheckCircle },
+    { id: "simplify", label: "Simplify", icon: FileText },
+    { id: "expand", label: "Make Longer", icon: Expand },
+    { id: "shorten", label: "Make Shorter", icon: Minimize },
+    { id: "summarize", label: "Summarize", icon: Lightbulb },
   ]
 
   const toneActions = [
-    { id: 'professional', label: 'Professional' },
-    { id: 'casual', label: 'Casual' },
-    { id: 'formal', label: 'Formal' },
-    { id: 'friendly', label: 'Friendly' },
-    { id: 'confident', label: 'Confident' },
-    { id: 'diplomatic', label: 'Diplomatic' },
+    { id: "professional", label: "Professional" },
+    { id: "casual", label: "Casual" },
+    { id: "formal", label: "Formal" },
+    { id: "friendly", label: "Friendly" },
+    { id: "confident", label: "Confident" },
+    { id: "diplomatic", label: "Diplomatic" },
   ]
 
   return (
     <>
       <ContextMenu>
-        <ContextMenuTrigger asChild>
-          {children}
-        </ContextMenuTrigger>
+        <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
         <ContextMenuContent className="w-64">
           {selection && !selection.isEmpty && (
             <>
-              <div className="px-2 py-1.5 text-sm font-semibold">
-                AI Actions
-              </div>
+              <div className="px-2 py-1.5 text-sm font-semibold">AI Actions</div>
               {quickActions.map((action) => (
-                <ContextMenuItem
-                  key={action.id}
-                  onClick={() => handleAIAction(action.id)}
-                >
+                <ContextMenuItem key={action.id} onClick={() => handleAIAction(action.id)}>
                   <action.icon className="mr-2 h-4 w-4" />
                   {action.label}
                 </ContextMenuItem>
               ))}
-              
+
               <ContextMenuSeparator />
-              
+
               <ContextMenuSub>
                 <ContextMenuSubTrigger>
                   <RefreshCw className="mr-2 h-4 w-4" />
@@ -113,16 +119,16 @@ export function AIContextMenu({ editor, children }: AIContextMenuProps) {
                   Translate
                 </ContextMenuSubTrigger>
                 <ContextMenuSubContent>
-                  <ContextMenuItem onClick={() => handleAIAction('translate:spanish')}>
+                  <ContextMenuItem onClick={() => handleAIAction("translate:spanish")}>
                     Spanish
                   </ContextMenuItem>
-                  <ContextMenuItem onClick={() => handleAIAction('translate:french')}>
+                  <ContextMenuItem onClick={() => handleAIAction("translate:french")}>
                     French
                   </ContextMenuItem>
-                  <ContextMenuItem onClick={() => handleAIAction('translate:german')}>
+                  <ContextMenuItem onClick={() => handleAIAction("translate:german")}>
                     German
                   </ContextMenuItem>
-                  <ContextMenuItem onClick={() => handleAIAction('translate:chinese')}>
+                  <ContextMenuItem onClick={() => handleAIAction("translate:chinese")}>
                     Chinese
                   </ContextMenuItem>
                 </ContextMenuSubContent>
@@ -130,7 +136,7 @@ export function AIContextMenu({ editor, children }: AIContextMenuProps) {
 
               <ContextMenuSeparator />
 
-              <ContextMenuItem onClick={() => handleAIAction('custom')}>
+              <ContextMenuItem onClick={() => handleAIAction("custom")}>
                 <Edit3 className="mr-2 h-4 w-4" />
                 Custom Edit...
               </ContextMenuItem>
@@ -146,15 +152,9 @@ export function AIContextMenu({ editor, children }: AIContextMenuProps) {
             Redo
           </ContextMenuItem>
           <ContextMenuSeparator />
-          <ContextMenuItem onClick={() => document.execCommand('copy')}>
-            Copy
-          </ContextMenuItem>
-          <ContextMenuItem onClick={() => document.execCommand('cut')}>
-            Cut
-          </ContextMenuItem>
-          <ContextMenuItem onClick={() => document.execCommand('paste')}>
-            Paste
-          </ContextMenuItem>
+          <ContextMenuItem onClick={() => document.execCommand("copy")}>Copy</ContextMenuItem>
+          <ContextMenuItem onClick={() => document.execCommand("cut")}>Cut</ContextMenuItem>
+          <ContextMenuItem onClick={() => document.execCommand("paste")}>Paste</ContextMenuItem>
         </ContextMenuContent>
       </ContextMenu>
 
@@ -167,4 +167,4 @@ export function AIContextMenu({ editor, children }: AIContextMenuProps) {
       />
     </>
   )
-} 
+}
