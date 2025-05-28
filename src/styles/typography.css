@@ -1,29 +1,63 @@
+/* Temporarily disabled due to Tailwind v4 compatibility issues */
+/*
 @layer base {
-  h1 {
-    @apply scroll-m-20 text-4xl font-extrabold tracking-tight text-5xl;
+  .prose h1 {
+    @apply font-extrabold tracking-tight;
+    font-size: 1.5rem;
   }
 
-  h2 {
-    @apply scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0;
+  .prose h2 {
+    @apply border-b pb-2 font-semibold tracking-tight first:mt-0;
+    font-size: 1.25rem;
   }
 
-  h3 {
-    @apply scroll-m-20 text-2xl font-semibold tracking-tight;
+  .prose h3 {
+    @apply font-semibold tracking-tight;
+    font-size: 1.125rem;
   }
 
-  h4 {
-    @apply scroll-m-20 text-xl font-semibold tracking-tight;
+  .prose h4 {
+    @apply font-semibold tracking-tight;
+    font-size: 1rem;
   }
 
-  p {
+  .prose h5 {
+    @apply font-semibold tracking-tight;
+    font-size: 0.875rem;
+  }
+
+  .prose h6 {
+    @apply font-semibold tracking-tight;
+    font-size: 0.75rem;
+  }
+
+  .prose p {
     @apply leading-7 [&:not(:first-child)]:mt-6;
   }
 
-  blockquote {
+  .prose blockquote {
     @apply mt-6 border-l-2 pl-6 italic;
   }
 
-  code {
-    @apply relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold;
+  .prose ul {
+    @apply my-6 ml-6 list-disc [&>li]:mt-2;
+  }
+
+  .prose ol {
+    @apply my-6 ml-6 list-decimal [&>li]:mt-2;
+  }
+
+  .prose code {
+    @apply relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono font-semibold;
+    font-size: 0.875rem;
+  }
+
+  .prose pre {
+    @apply overflow-x-auto rounded-lg bg-muted p-4;
+  }
+
+  .prose pre code {
+    @apply bg-transparent p-0;
   }
 }
+*/

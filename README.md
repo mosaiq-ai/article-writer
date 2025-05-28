@@ -210,3 +210,80 @@ This project is licensed under the MIT License.
 - [Tailwind CSS Documentation](https://tailwindcss.com/docs)
 - [Vitest Documentation](https://vitest.dev)
 - [TypeScript Handbook](https://www.typescriptlang.org/docs/)
+
+## Quick Start
+
+1. **Install dependencies:**
+   ```bash
+   pnpm install
+   ```
+
+2. **Set up environment variables (optional for AI features):**
+   Create a `.env.local` file in the root directory:
+   ```bash
+   # AI Provider API Keys (optional - enables AI-powered search)
+   OPENAI_API_KEY=your_openai_api_key_here
+   ANTHROPIC_API_KEY=your_anthropic_api_key_here  
+   GOOGLE_AI_API_KEY=your_google_ai_api_key_here
+   ```
+
+3. **Start the development server:**
+   ```bash
+   pnpm dev
+   ```
+
+4. **Open the editor:**
+   Navigate to http://localhost:3000/editor (or the port shown in terminal)
+
+## Features
+
+### ✅ Phase 3.3 - Document Search & Reference System
+
+- **Hybrid Search**: Combines keyword and AI-powered semantic search
+- **Document Management**: Upload and search across multiple documents  
+- **Citation System**: Professional citation management (APA, MLA, Chicago)
+- **Cross-References**: Automatic numbering and linking of headings, figures, tables
+- **Rich Text Editor**: Tiptap-powered editor with AI enhancements
+
+### 🔧 AI Features
+
+The application works without API keys using keyword search only. To enable AI-powered features:
+
+1. **OpenAI**: Get API key from https://platform.openai.com/api-keys
+2. **Anthropic**: Get API key from https://console.anthropic.com/
+3. **Google AI**: Get API key from https://aistudio.google.com/app/apikey
+
+Add any one or more API keys to `.env.local` to enable:
+- AI-powered semantic search
+- Intelligent document analysis
+- Content generation assistance
+
+### 🎯 Testing the Search
+
+The app includes test documents for immediate testing:
+- "Introduction to Machine Learning"
+- "React Development Best Practices" 
+- "Database Design Principles"
+
+Try searching for: "machine learning", "react", "database", "javascript"
+
+## Architecture
+
+- **Frontend**: Next.js 15.3 with React 19
+- **Editor**: Tiptap 3.0 with ProseMirror
+- **AI**: Vercel AI SDK 4.2 with multi-provider support
+- **UI**: shadcn/ui with Tailwind CSS
+- **Search**: Hybrid keyword + semantic search
+
+## Development Status
+
+- ✅ Phase 1: Foundation Setup
+- ✅ Phase 2: AI Integration  
+- ✅ Phase 3.1: Tiptap Editor Integration
+- ✅ Phase 3.2: AI-Powered Text Selection & Editing
+- ✅ Phase 3.3: Document Search & Reference System
+- 🚧 Phase 3.4: Agentic Document Generation Interface (Next)
+
+## Contributing
+
+This is an internal tool for advanced document creation with AI assistance. See the phase documentation in the project for detailed implementation notes.

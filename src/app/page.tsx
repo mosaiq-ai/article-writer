@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import Link from "next/link"
 
 export default function Home() {
   return (
@@ -12,7 +13,9 @@ export default function Home() {
             materials.
           </p>
           <div className="flex gap-4 justify-center">
-            <Button size="lg">Create New Document</Button>
+            <Link href="/editor">
+              <Button size="lg">Try the AI Editor</Button>
+            </Link>
             <Button variant="outline" size="lg">
               Browse Templates
             </Button>
@@ -29,8 +32,7 @@ export default function Home() {
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">
-                Integrate with GPT-4, Claude, and Gemini for diverse writing styles and
-                capabilities.
+                Right-click any text for AI editing options: improve writing, fix grammar, change tone, translate, and more.
               </p>
             </CardContent>
           </Card>
@@ -42,7 +44,7 @@ export default function Home() {
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">
-                Professional-grade editor with AI assistance, collaborative features, and extensible
+                Professional-grade editor with AI assistance, real-time collaboration, and extensible
                 plugins.
               </p>
             </CardContent>
@@ -67,18 +69,18 @@ export default function Home() {
           <div className="grid md:grid-cols-2 gap-4 max-w-2xl mx-auto">
             <div className="p-4 bg-green-50 dark:bg-green-950 rounded-lg">
               <h3 className="text-green-800 dark:text-green-200 font-semibold">
-                ✅ Phase 1 Complete
+                ✅ Phase 3.1 & 3.2 Complete
               </h3>
               <p className="text-green-600 dark:text-green-300 text-sm">
-                Foundation setup with Next.js 15.3, TypeScript, shadcn/ui, and testing
+                Rich text editor + AI-powered text selection and editing with context menus
               </p>
             </div>
             <div className="p-4 bg-blue-50 dark:bg-blue-950 rounded-lg">
               <h3 className="text-blue-800 dark:text-blue-200 font-semibold">
-                🚧 Next: AI Integration
+                🚧 Next: Document Search
               </h3>
               <p className="text-blue-600 dark:text-blue-300 text-sm">
-                Phase 2: Vercel AI SDK, LLM providers, and agentic workflows
+                Phase 3.3: Document search, citations, and reference management system
               </p>
             </div>
           </div>

@@ -1,0 +1,1 @@
+This is a test PDF content for extraction testing. It contains multiple sentences and should be processed correctly by the new PDF extraction system.

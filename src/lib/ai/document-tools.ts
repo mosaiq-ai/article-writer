@@ -7,7 +7,9 @@ export const documentTools: Record<string, CoreTool> = {
     description: "List all available documents with their metadata",
     parameters: z.object({}),
     execute: async () => {
+      console.log('🔧 Document Tools: listDocuments called')
       const documents = await documentStore.list()
+      console.log(`🔧 Document Tools: Found ${documents.length} documents`)
       return {
         documents: documents.map((doc) => ({
           id: doc.id,
@@ -26,10 +28,13 @@ export const documentTools: Record<string, CoreTool> = {
       documentId: z.string().describe("The ID of the document to retrieve"),
     }),
     execute: async ({ documentId }) => {
+      console.log(`🔧 Document Tools: getDocument called for ID: ${documentId}`)
       const document = await documentStore.retrieve(documentId)
       if (!document) {
+        console.log(`🔧 Document Tools: Document ${documentId} not found`)
         return { error: `Document with ID ${documentId} not found` }
       }
+      console.log(`🔧 Document Tools: Retrieved document: ${document.title}`)
       return {
         id: document.id,
         title: document.title,

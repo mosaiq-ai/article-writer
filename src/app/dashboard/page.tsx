@@ -6,6 +6,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import Link from "next/link"
+import { FileText, Wand2 } from "lucide-react"
 
 interface DocumentMetadata {
   fileType: string
@@ -93,7 +95,7 @@ export default function Dashboard() {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      <h1 className="text-3xl font-bold">AI Document Editor Dashboard</h1>
+      <h1 className="text-2xl font-bold">AI Document Editor Dashboard</h1>
 
       {/* Document Upload Section */}
       <Card>
@@ -171,6 +173,31 @@ export default function Dashboard() {
           )}
         </CardContent>
       </Card>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              AI Document Editor
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-4">
+              Create intelligent documents with our AI agent system
+            </p>
+            <Button asChild className="w-full">
+              <Link href="/editor">
+                <Wand2 className="mr-2 h-4 w-4" />
+                Open Editor
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+        </Card>
+      </div>
     </div>
   )
 }

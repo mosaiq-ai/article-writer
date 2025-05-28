@@ -23,8 +23,8 @@ export const models = {
   // GPT-4 for complex reasoning and analysis
   "gpt-4.1": {
     provider: openai,
-    modelId: "gpt-4o",
-    maxTokens: 4096,
+    modelId: "gpt-4.1",
+    maxTokens: 14096,
     contextWindow: 128000,
     capabilities: ["reasoning", "analysis", "code", "long-context"],
     costPer1kInput: 0.01,
@@ -33,8 +33,8 @@ export const models = {
   // Claude 3.7 Sonnet for creative writing and synthesis
   "claude-4-sonnet": {
     provider: anthropic,
-    modelId: "claude-sonnet-4-20250514",
-    maxTokens: 200000,
+    modelId: "claude-3-5-sonnet-20241022",
+    maxTokens: 8192,
     contextWindow: 200000,
     capabilities: ["writing", "synthesis", "long-context", "nuanced"],
     costPer1kInput: 0.003,
@@ -44,7 +44,7 @@ export const models = {
   "gemini-2.5-pro": {
     provider: google,
     modelId: "gemini-1.5-flash",
-    maxTokens: 1000000,
+    maxTokens: 8192,
     contextWindow: 1000000,
     capabilities: ["research", "multimodal", "ultra-long-context", "full-document"],
     costPer1kInput: 0.00125,
