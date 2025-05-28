@@ -1,0 +1,8 @@
+node_modules
+.next
+out
+build
+coverage
+.vercel
+*.min.js
+*.min.css 
