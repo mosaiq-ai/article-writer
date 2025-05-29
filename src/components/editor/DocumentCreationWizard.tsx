@@ -1,6 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Card } from "@/components/ui/card"
 import {
   Dialog,
   DialogContent,
@@ -9,10 +11,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import { Progress } from "@/components/ui/progress"
 import {
   Select,
@@ -21,18 +21,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Card } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+import { Textarea } from "@/components/ui/textarea"
 import {
+  CheckCircle,
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  Edit,
   FileText,
+  Loader2,
   Upload,
   Wand2,
-  ChevronRight,
-  ChevronLeft,
-  Loader2,
-  CheckCircle,
 } from "lucide-react"
+import { useState } from "react"
 import { useDropzone } from "react-dropzone"
+import { Editor } from "./Editor"
 
 interface DocumentCreationWizardProps {
   open: boolean
@@ -53,13 +56,22 @@ interface WizardData {
   preferredModel: string
 }
 
-export function DocumentCreationWizard({
-  open,
-  onOpenChange,
-  onFlowStart,
-}: DocumentCreationWizardProps) {
+interface FlowProgress {
+  progress: number
+  currentAgent?: string
+  message: string
+  status?: string
+}
+
+export function DocumentCreationWizard({ open, onOpenChange }: DocumentCreationWizardProps) {
   const [currentStep, setCurrentStep] = useState<WizardStep>("goal")
   const [isProcessing, setIsProcessing] = useState(false)
+  const [isCompleted, setIsCompleted] = useState(false)
+  const [generatedDocument, setGeneratedDocument] = useState<string>("")
+  const [flowProgress, setFlowProgress] = useState<FlowProgress>({
+    progress: 0,
+    message: "Ready to start...",
+  })
   const [wizardData, setWizardData] = useState<WizardData>({
     goal: "",
     description: "",
@@ -208,6 +220,8 @@ export function DocumentCreationWizard({
 
   const handleCreate = async () => {
     setIsProcessing(true)
+    setFlowProgress({ progress: 0, message: "Starting document creation..." })
+
     try {
       // Ensure we have documents to work with
       if (wizardData.processedDocumentIds.length === 0) {
@@ -216,7 +230,6 @@ export function DocumentCreationWizard({
         )
       }
 
-      // Use the actual agent flow API from Phase 2
       const context = {
         goal: wizardData.goal,
         documentIds: wizardData.processedDocumentIds,
@@ -229,9 +242,9 @@ export function DocumentCreationWizard({
         ],
       }
 
-      console.log("🚀 Starting agent flow with context:", context)
+      console.log("🚀 Starting agent flow with SSE:", context)
 
-      // Call the actual agent flow API
+      // Use Server-Sent Events for real-time progress
       const response = await fetch("/api/agents/flow", {
         method: "POST",
         headers: {
@@ -245,30 +258,117 @@ export function DocumentCreationWizard({
         throw new Error(`Failed to start agent flow: ${response.status} ${errorData}`)
       }
 
-      const flowResult = await response.json()
-      console.log("🎯 Agent flow started:", flowResult)
-
-      // Generate a unique flow ID for monitoring
-      const flowId = `flow_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-
-      // Close the wizard and start monitoring
-      onOpenChange(false)
-
-      // Pass the flow ID to the parent for monitoring
-      if (onFlowStart) {
-        onFlowStart(flowId)
+      if (!response.body) {
+        throw new Error("No response body received")
       }
 
-      // Store the flow result for later retrieval
-      sessionStorage.setItem(`flow_${flowId}`, JSON.stringify(flowResult))
+      // Set up SSE reader
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+
+          const chunk = decoder.decode(value)
+          const lines = chunk.split("\n")
+
+          for (const line of lines) {
+            if (line.startsWith("data: ")) {
+              try {
+                const data = JSON.parse(line.slice(6))
+
+                // Update progress based on event type
+                switch (data.type) {
+                  case "started":
+                    setFlowProgress({
+                      progress: data.progress,
+                      message: data.message,
+                    })
+                    break
+
+                  case "progress":
+                    setFlowProgress({
+                      progress: data.progress,
+                      currentAgent: data.currentAgent,
+                      message: data.message,
+                      status: data.status,
+                    })
+                    break
+
+                  case "completed": {
+                    setFlowProgress({
+                      progress: 100,
+                      message: data.message,
+                      status: data.status,
+                    })
+
+                    // Set the generated document content
+                    if (data.finalDocument) {
+                      setGeneratedDocument(data.finalDocument)
+                      setIsCompleted(true)
+                      setIsProcessing(false)
+                      console.log("🎯 Document generation completed, showing editor")
+                    }
+
+                    return
+                  }
+
+                  case "error":
+                    throw new Error(data.error || "Unknown error occurred")
+                }
+              } catch (parseError) {
+                console.warn("Failed to parse SSE data:", parseError)
+              }
+            }
+          }
+        }
+      } finally {
+        reader.releaseLock()
+      }
     } catch (error) {
       console.error("❌ Document creation error:", error)
+      setFlowProgress({
+        progress: 0,
+        message: `Error: ${error instanceof Error ? error.message : "Unknown error"}`,
+      })
       alert(
         `Failed to create document: ${error instanceof Error ? error.message : "Unknown error"}`
       )
     } finally {
       setIsProcessing(false)
     }
+  }
+
+  const handleReset = () => {
+    setIsCompleted(false)
+    setGeneratedDocument("")
+    setCurrentStep("goal")
+    setIsProcessing(false)
+    setFlowProgress({ progress: 0, message: "Ready to start..." })
+    setWizardData({
+      goal: "",
+      description: "",
+      sources: [],
+      processedDocumentIds: [],
+      style: "professional",
+      length: "medium",
+      audience: "general",
+      preferredModel: "claude-4-sonnet",
+    })
+  }
+
+  const handleDownload = () => {
+    const blob = new Blob([generatedDocument], { type: "text/html" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `${wizardData.goal.replace(/[^a-z0-9]/gi, "_").toLowerCase()}.html`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
   }
 
   const renderStepContent = () => {
@@ -336,7 +436,7 @@ export function DocumentCreationWizard({
               <div className="space-y-2">
                 <Label>Uploaded Files ({wizardData.processedDocumentIds.length} processed)</Label>
                 {wizardData.sources.map((file, index) => (
-                  <Card key={index} className="p-3">
+                  <Card key={`${file.name}-${file.size}-${index}`} className="p-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <FileText className="h-4 w-4 text-muted-foreground" />
@@ -473,6 +573,30 @@ export function DocumentCreationWizard({
       case "review":
         return (
           <div className="space-y-4">
+            {/* Show real-time progress when processing */}
+            {isProcessing && (
+              <div className="space-y-3">
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Progress</span>
+                    <span>{flowProgress.progress}%</span>
+                  </div>
+                  <Progress value={flowProgress.progress} />
+                </div>
+                <div className="text-center">
+                  <div className="flex items-center justify-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span className="text-sm text-muted-foreground">{flowProgress.message}</span>
+                  </div>
+                  {flowProgress.currentAgent && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Current agent: {flowProgress.currentAgent}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
             <div className="space-y-3">
               <div>
                 <Label className="text-muted-foreground">Goal</Label>
@@ -484,7 +608,7 @@ export function DocumentCreationWizard({
                 <div className="flex flex-wrap gap-2 mt-1">
                   {wizardData.sources.length > 0 ? (
                     wizardData.sources.map((file, index) => (
-                      <Badge key={index} variant="secondary">
+                      <Badge key={`${file.name}-${file.size}-${index}`} variant="secondary">
                         {file.name}
                       </Badge>
                     ))
@@ -505,70 +629,123 @@ export function DocumentCreationWizard({
               </div>
             </div>
 
-            <div className="bg-muted/50 rounded-lg p-4">
-              <p className="text-sm text-muted-foreground">
-                The AI will analyze your source documents and create a new document based on your
-                specifications. This process typically takes 1-3 minutes and will use the full
-                content of your documents for accurate, grounded writing.
-              </p>
-            </div>
+            {!isProcessing && (
+              <div className="bg-muted/50 rounded-lg p-4">
+                <p className="text-sm text-muted-foreground">
+                  The AI will analyze your source documents and create a new document based on your
+                  specifications. This process typically takes 1-3 minutes and will use the full
+                  content of your documents for accurate, grounded writing.
+                </p>
+              </div>
+            )}
           </div>
         )
+
+      default:
+        return null
     }
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className={isCompleted ? "max-w-7xl h-[90vh]" : "max-w-2xl"}>
         <DialogHeader>
-          <DialogTitle>Create New Document with AI</DialogTitle>
-          <DialogDescription>{steps[currentStepIndex].description}</DialogDescription>
+          <DialogTitle>
+            {isCompleted ? "Edit Generated Document" : "Create New Document with AI"}
+          </DialogTitle>
+          <DialogDescription>
+            {isCompleted
+              ? "Your document has been generated successfully. You can now edit it below."
+              : steps[currentStepIndex].description}
+          </DialogDescription>
         </DialogHeader>
 
-        {/* Progress */}
-        <div className="space-y-2">
-          <Progress value={((currentStepIndex + 1) / steps.length) * 100} />
-          <div className="flex justify-between text-xs text-muted-foreground">
-            {steps.map((step, index) => (
-              <span key={step.id} className={index <= currentStepIndex ? "text-foreground" : ""}>
-                {step.title}
-              </span>
-            ))}
+        {isCompleted ? (
+          // Show Editor when document is ready
+          <div className="flex flex-col h-full">
+            <div className="flex-1 overflow-hidden">
+              <Editor
+                content={generatedDocument}
+                onChange={(content) => setGeneratedDocument(content)}
+                className="h-full"
+              />
+            </div>
           </div>
-        </div>
+        ) : (
+          // Show wizard steps
+          <>
+            {/* Progress */}
+            <div className="space-y-2">
+              <Progress value={((currentStepIndex + 1) / steps.length) * 100} />
+              <div className="flex justify-between text-xs text-muted-foreground">
+                {steps.map((step, index) => (
+                  <span
+                    key={step.id}
+                    className={index <= currentStepIndex ? "text-foreground" : ""}
+                  >
+                    {step.title}
+                  </span>
+                ))}
+              </div>
+            </div>
 
-        {/* Step Content */}
-        <div className="min-h-[300px] py-4">{renderStepContent()}</div>
+            {/* Step Content */}
+            <div className="min-h-[300px] py-4">{renderStepContent()}</div>
+          </>
+        )}
 
         <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={handleBack}
-            disabled={currentStepIndex === 0 || isProcessing}
-          >
-            <ChevronLeft className="mr-2 h-4 w-4" />
-            Back
-          </Button>
-
-          {currentStep === "review" ? (
-            <Button onClick={handleCreate} disabled={!canProceed() || isProcessing}>
-              {isProcessing ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Creating...
-                </>
-              ) : (
-                <>
-                  <Wand2 className="mr-2 h-4 w-4" />
-                  Create Document
-                </>
-              )}
-            </Button>
+          {isCompleted ? (
+            // Actions for completed document
+            <div className="flex justify-between w-full">
+              <Button variant="outline" onClick={handleReset}>
+                <ChevronLeft className="mr-2 h-4 w-4" />
+                Create Another
+              </Button>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={handleDownload}>
+                  <Download className="mr-2 h-4 w-4" />
+                  Download
+                </Button>
+                <Button onClick={() => onOpenChange(false)}>
+                  <Edit className="mr-2 h-4 w-4" />
+                  Close Editor
+                </Button>
+              </div>
+            </div>
           ) : (
-            <Button onClick={handleNext} disabled={!canProceed() || isProcessing}>
-              Next
-              <ChevronRight className="ml-2 h-4 w-4" />
-            </Button>
+            // Wizard navigation
+            <>
+              <Button
+                variant="outline"
+                onClick={handleBack}
+                disabled={currentStepIndex === 0 || isProcessing}
+              >
+                <ChevronLeft className="mr-2 h-4 w-4" />
+                Back
+              </Button>
+
+              {currentStep === "review" ? (
+                <Button onClick={handleCreate} disabled={!canProceed() || isProcessing}>
+                  {isProcessing ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    <>
+                      <Wand2 className="mr-2 h-4 w-4" />
+                      Create Document
+                    </>
+                  )}
+                </Button>
+              ) : (
+                <Button onClick={handleNext} disabled={!canProceed() || isProcessing}>
+                  Next
+                  <ChevronRight className="ml-2 h-4 w-4" />
+                </Button>
+              )}
+            </>
           )}
         </DialogFooter>
       </DialogContent>
