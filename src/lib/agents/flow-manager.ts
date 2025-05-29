@@ -15,20 +15,8 @@ export interface FlowState {
 }
 
 export class FlowManager {
-  private static instance: FlowManager | null = null
   private flows: Map<string, FlowState> = new Map()
   private orchestrator = new DocumentCreationOrchestrator()
-
-  // Singleton pattern to ensure shared state across API endpoints
-  public static getInstance(): FlowManager {
-    if (!FlowManager.instance) {
-      FlowManager.instance = new FlowManager()
-    }
-    return FlowManager.instance
-  }
-
-  // Private constructor to prevent direct instantiation
-  private constructor() {}
 
   // Start a new flow
   async *startFlow(context: AgentContext): AsyncGenerator<FlowState> {
@@ -51,25 +39,10 @@ export class FlowManager {
       for await (const result of this.orchestrator.executeFlow(context)) {
         stepCount++
 
-        console.log("🔍 FlowManager: Received result from orchestrator:", {
-          agentName: result.agentName,
-          status: result.status,
-          hasOutput: !!result.output,
-          resultObject: result,
-        })
-
         // Update flow state
         flowState.results.push(result)
         flowState.progress = (stepCount / totalSteps) * 100
         flowState.currentAgent = result.agentName
-
-        console.log("🔍 FlowManager: Updated flow state:", {
-          id: flowState.id,
-          progress: flowState.progress,
-          currentAgent: flowState.currentAgent,
-          resultsLength: flowState.results.length,
-          status: flowState.status,
-        })
 
         if (result.status === "error") {
           flowState.status = "failed"

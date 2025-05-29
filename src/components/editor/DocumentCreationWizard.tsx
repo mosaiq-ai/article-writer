@@ -31,7 +31,6 @@ import {
   ChevronLeft,
   Loader2,
   CheckCircle,
-  AlertCircle,
 } from "lucide-react"
 import { useDropzone } from "react-dropzone"
 
@@ -60,8 +59,7 @@ export function DocumentCreationWizard({
   onFlowStart,
 }: DocumentCreationWizardProps) {
   const [currentStep, setCurrentStep] = useState<WizardStep>("goal")
-  const [isCreatingDocument, setIsCreatingDocument] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [isProcessing, setIsProcessing] = useState(false)
   const [wizardData, setWizardData] = useState<WizardData>({
     goal: "",
     description: "",
@@ -100,6 +98,7 @@ export function DocumentCreationWizard({
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop: async (acceptedFiles: File[]) => {
+      setIsProcessing(true)
       try {
         const processedIds: string[] = []
         const successfulFiles: File[] = []
@@ -163,6 +162,8 @@ export function DocumentCreationWizard({
         alert(
           `Failed to process documents: ${error instanceof Error ? error.message : "Unknown error"}. Please ensure the Python PDF service is running.`
         )
+      } finally {
+        setIsProcessing(false)
       }
     },
     accept: {
@@ -173,21 +174,6 @@ export function DocumentCreationWizard({
       "text/markdown": [".md"],
     },
   })
-
-  // Close wizard and reset state when flow starts successfully
-  const resetWizard = () => {
-    setCurrentStep("goal")
-    setWizardData({
-      goal: "",
-      description: "",
-      sources: [],
-      processedDocumentIds: [],
-      style: "professional",
-      length: "medium",
-      audience: "general",
-      preferredModel: "claude-4-sonnet",
-    })
-  }
 
   const canProceed = (): boolean => {
     switch (currentStep) {
@@ -221,10 +207,8 @@ export function DocumentCreationWizard({
   }
 
   const handleCreate = async () => {
+    setIsProcessing(true)
     try {
-      setIsCreatingDocument(true)
-      setError(null)
-
       // Ensure we have documents to work with
       if (wizardData.processedDocumentIds.length === 0) {
         throw new Error(
@@ -232,7 +216,7 @@ export function DocumentCreationWizard({
         )
       }
 
-      // Create the agent context
+      // Use the actual agent flow API from Phase 2
       const context = {
         goal: wizardData.goal,
         documentIds: wizardData.processedDocumentIds,
@@ -245,10 +229,10 @@ export function DocumentCreationWizard({
         ],
       }
 
-      console.log("🚀 Wizard: Starting direct flow API call with context:", context)
+      console.log("🚀 Starting agent flow with context:", context)
 
-      // Start the flow via direct API call (no streaming in wizard)
-      const response = await fetch("/api/agents/flow/stream", {
+      // Call the actual agent flow API
+      const response = await fetch("/api/agents/flow", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -257,53 +241,33 @@ export function DocumentCreationWizard({
       })
 
       if (!response.ok) {
-        throw new Error(`Failed to start flow: ${response.statusText}`)
+        const errorData = await response.text()
+        throw new Error(`Failed to start agent flow: ${response.status} ${errorData}`)
       }
 
-      // Read the first chunk to get the flow ID
-      const reader = response.body?.getReader()
-      const decoder = new TextDecoder()
+      const flowResult = await response.json()
+      console.log("🎯 Agent flow started:", flowResult)
 
-      if (!reader) {
-        throw new Error("No response body available")
+      // Generate a unique flow ID for monitoring
+      const flowId = `flow_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+
+      // Close the wizard and start monitoring
+      onOpenChange(false)
+
+      // Pass the flow ID to the parent for monitoring
+      if (onFlowStart) {
+        onFlowStart(flowId)
       }
 
-      const { value } = await reader.read()
-      const chunk = decoder.decode(value)
-
-      // Parse the first SSE message to get flow ID
-      const lines = chunk.split("\n")
-      for (const line of lines) {
-        if (line.startsWith("data: ")) {
-          try {
-            const data = JSON.parse(line.slice(6))
-            if (data.id) {
-              console.log("🎯 Wizard: Got flow ID, closing wizard and passing to parent:", data.id)
-
-              // Close the reader since parent will handle monitoring
-              reader.cancel()
-
-              // Close wizard immediately
-              onOpenChange(false)
-              resetWizard()
-
-              // Pass flow ID to parent for monitoring
-              onFlowStart?.(data.id)
-
-              return
-            }
-          } catch (parseError) {
-            console.error("Failed to parse initial SSE data:", parseError)
-          }
-        }
-      }
-
-      throw new Error("Failed to get flow ID from initial response")
+      // Store the flow result for later retrieval
+      sessionStorage.setItem(`flow_${flowId}`, JSON.stringify(flowResult))
     } catch (error) {
-      console.error("❌ Wizard: Document creation error:", error)
-      setError(error instanceof Error ? error.message : "Unknown error")
+      console.error("❌ Document creation error:", error)
+      alert(
+        `Failed to create document: ${error instanceof Error ? error.message : "Unknown error"}`
+      )
     } finally {
-      setIsCreatingDocument(false)
+      setIsProcessing(false)
     }
   }
 
@@ -361,7 +325,7 @@ export function DocumentCreationWizard({
               </p>
             </div>
 
-            {isCreatingDocument && (
+            {isProcessing && (
               <div className="flex items-center justify-center py-4">
                 <Loader2 className="h-6 w-6 animate-spin mr-2" />
                 <span className="text-sm text-muted-foreground">Processing documents...</span>
@@ -393,7 +357,7 @@ export function DocumentCreationWizard({
                             ),
                           }))
                         }}
-                        disabled={isCreatingDocument}
+                        disabled={isProcessing}
                       >
                         Remove
                       </Button>
@@ -574,33 +538,21 @@ export function DocumentCreationWizard({
         </div>
 
         {/* Step Content */}
-        <div className="min-h-[300px] py-4">
-          {/* Show error if there's one from the flow */}
-          {error && (
-            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-              <div className="flex items-center gap-2 text-red-800">
-                <AlertCircle className="h-4 w-4" />
-                <span className="text-sm font-medium">Document Creation Error</span>
-              </div>
-              <p className="text-sm text-red-700 mt-1">{error}</p>
-            </div>
-          )}
-          {renderStepContent()}
-        </div>
+        <div className="min-h-[300px] py-4">{renderStepContent()}</div>
 
         <DialogFooter>
           <Button
             variant="outline"
             onClick={handleBack}
-            disabled={currentStepIndex === 0 || isCreatingDocument}
+            disabled={currentStepIndex === 0 || isProcessing}
           >
             <ChevronLeft className="mr-2 h-4 w-4" />
             Back
           </Button>
 
           {currentStep === "review" ? (
-            <Button onClick={handleCreate} disabled={!canProceed() || isCreatingDocument}>
-              {isCreatingDocument ? (
+            <Button onClick={handleCreate} disabled={!canProceed() || isProcessing}>
+              {isProcessing ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Creating...
@@ -613,7 +565,7 @@ export function DocumentCreationWizard({
               )}
             </Button>
           ) : (
-            <Button onClick={handleNext} disabled={!canProceed() || isCreatingDocument}>
+            <Button onClick={handleNext} disabled={!canProceed() || isProcessing}>
               Next
               <ChevronRight className="ml-2 h-4 w-4" />
             </Button>

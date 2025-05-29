@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { FlowManager } from "@/lib/agents/flow-manager"
 import { AgentContext } from "@/lib/agents/types"
 
-const flowManager = FlowManager.getInstance()
+const flowManager = new FlowManager()
 
 export async function POST(request: NextRequest) {
   try {

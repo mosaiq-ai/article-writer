@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
@@ -22,7 +22,30 @@ import {
   Sparkles,
 } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
-import { FlowState } from "@/hooks/use-agent-flow"
+
+export interface FlowState {
+  id: string
+  status: "running" | "completed" | "failed" | "paused"
+  progress: number
+  currentAgent?: string
+  startTime?: string
+  endTime?: string
+  results: AgentResult[]
+}
+
+interface AgentResult {
+  agentName: string
+  output: Record<string, unknown> | string | null
+  metadata: {
+    tokensUsed: number
+    timeElapsed: number
+    model: string
+    documentsAccessed: string[]
+    toolCalls?: ToolCall[]
+  }
+  status: "success" | "error" | "partial"
+  error?: string
+}
 
 interface ToolCall {
   toolName: string
@@ -30,10 +53,9 @@ interface ToolCall {
 }
 
 interface AgentProgressDashboardProps {
+  flowId?: string
   flowState?: FlowState
   onComplete?: (document: Record<string, unknown> | string) => void
-  onPauseResume?: (flowId: string, isPaused: boolean) => void
-  onRetry?: (flowId: string) => void
 }
 
 const agentIcons = {
@@ -44,28 +66,58 @@ const agentIcons = {
 }
 
 export function AgentProgressDashboard({
-  flowState,
+  flowId,
+  flowState: externalFlowState,
   onComplete,
-  onPauseResume,
-  onRetry,
 }: AgentProgressDashboardProps) {
-  const [selectedAgent, setSelectedAgent] = useState<string | null>(null)
+  const [flowState, setFlowState] = useState<FlowState | null>(externalFlowState || null)
   const [isPaused, setIsPaused] = useState(false)
+  const [selectedAgent, setSelectedAgent] = useState<string | null>(null)
 
-  console.log("🔍 Dashboard: Rendering with flowState:", {
-    id: flowState?.id,
-    status: flowState?.status,
-    progress: flowState?.progress,
-    currentAgent: flowState?.currentAgent,
-    resultsCount: flowState?.results?.length || 0,
-  })
+  useEffect(() => {
+    // If we have external flow state, use it
+    if (externalFlowState) {
+      setFlowState(externalFlowState)
+      return
+    }
+
+    // Otherwise, try to connect to SSE stream if flowId is provided
+    if (!flowId) return
+
+    const eventSource = new EventSource(`/api/agents/flow/stream?id=${flowId}`)
+
+    eventSource.onmessage = (event) => {
+      const state = JSON.parse(event.data) as FlowState
+      setFlowState(state)
+
+      if (state.status === "completed" && state.results.length > 0) {
+        const finalResult = state.results[state.results.length - 1]
+        const finalDocument =
+          typeof finalResult.output === "object" && finalResult.output
+            ? (finalResult.output as Record<string, unknown>).finalDocument
+            : finalResult.output
+        onComplete?.(finalDocument as Record<string, unknown> | string)
+      }
+    }
+
+    eventSource.onerror = () => {
+      eventSource.close()
+    }
+
+    return () => {
+      eventSource.close()
+    }
+  }, [flowId, externalFlowState, onComplete])
 
   if (!flowState) {
     return (
       <Card>
         <CardContent className="flex items-center justify-center h-64">
           <div className="text-center">
-            <p className="text-sm text-muted-foreground">No flow data available</p>
+            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+            <p className="text-sm text-muted-foreground">
+              {flowId ? "Connecting to agent flow..." : "No flow data available"}
+            </p>
           </div>
         </CardContent>
       </Card>
@@ -73,10 +125,12 @@ export function AgentProgressDashboard({
   }
 
   const handlePauseResume = async () => {
-    if (!flowState.id) return
+    if (!flowId) return
 
     try {
-      onPauseResume?.(flowState.id, isPaused)
+      await fetch(`/api/agents/flow/${flowId}/${isPaused ? "resume" : "pause"}`, {
+        method: "POST",
+      })
       setIsPaused(!isPaused)
     } catch (error) {
       console.error("Failed to pause/resume flow:", error)
@@ -84,10 +138,12 @@ export function AgentProgressDashboard({
   }
 
   const handleRetry = async () => {
-    if (!flowState.id) return
+    if (!flowId) return
 
     try {
-      onRetry?.(flowState.id)
+      await fetch(`/api/agents/flow/${flowId}/retry`, {
+        method: "POST",
+      })
     } catch (error) {
       console.error("Failed to retry flow:", error)
     }
@@ -111,20 +167,22 @@ export function AgentProgressDashboard({
           <div className="flex items-center justify-between">
             <CardTitle>Document Generation Progress</CardTitle>
             <div className="flex gap-2">
-              {onPauseResume && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handlePauseResume}
-                  disabled={flowState.status !== "running"}
-                >
-                  {isPaused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
-                </Button>
-              )}
-              {flowState.status === "failed" && onRetry && (
-                <Button size="sm" variant="outline" onClick={handleRetry}>
-                  <RotateCcw className="h-4 w-4" />
-                </Button>
+              {flowId && (
+                <>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handlePauseResume}
+                    disabled={flowState.status !== "running"}
+                  >
+                    {isPaused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
+                  </Button>
+                  {flowState.status === "failed" && (
+                    <Button size="sm" variant="outline" onClick={handleRetry}>
+                      <RotateCcw className="h-4 w-4" />
+                    </Button>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -157,12 +215,12 @@ export function AgentProgressDashboard({
                 </span>
               )}
             </div>
-            {flowState.endTime && flowState.startTime && (
+            {flowState.endTime && (
               <span className="text-muted-foreground">
                 Completed in{" "}
                 {Math.round(
                   (new Date(flowState.endTime).getTime() -
-                    new Date(flowState.startTime).getTime()) /
+                    new Date(flowState.startTime!).getTime()) /
                     1000
                 )}
                 s
