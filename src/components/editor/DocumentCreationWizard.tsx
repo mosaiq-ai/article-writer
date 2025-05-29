@@ -1,6 +1,6 @@
-'use client'
+"use client"
 
-import { useState } from 'react'
+import { useState } from "react"
 import {
   Dialog,
   DialogContent,
@@ -8,27 +8,32 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
-import { Progress } from '@/components/ui/progress'
+} from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { Progress } from "@/components/ui/progress"
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select'
-import { Card } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+} from "@/components/ui/select"
+import { Card } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 import {
-  FileText, Upload, Wand2,
-  ChevronRight, ChevronLeft, Loader2,
+  FileText,
+  Upload,
+  Wand2,
+  ChevronRight,
+  ChevronLeft,
+  Loader2,
   CheckCircle,
-} from 'lucide-react'
-import { useDropzone } from 'react-dropzone'
+  AlertCircle,
+} from "lucide-react"
+import { useDropzone } from "react-dropzone"
 
 interface DocumentCreationWizardProps {
   open: boolean
@@ -36,7 +41,7 @@ interface DocumentCreationWizardProps {
   onFlowStart?: (flowId: string) => void
 }
 
-type WizardStep = 'goal' | 'sources' | 'settings' | 'review'
+type WizardStep = "goal" | "sources" | "settings" | "review"
 
 interface WizardData {
   goal: string
@@ -54,127 +59,145 @@ export function DocumentCreationWizard({
   onOpenChange,
   onFlowStart,
 }: DocumentCreationWizardProps) {
-  const [currentStep, setCurrentStep] = useState<WizardStep>('goal')
-  const [isProcessing, setIsProcessing] = useState(false)
+  const [currentStep, setCurrentStep] = useState<WizardStep>("goal")
+  const [isCreatingDocument, setIsCreatingDocument] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [wizardData, setWizardData] = useState<WizardData>({
-    goal: '',
-    description: '',
+    goal: "",
+    description: "",
     sources: [],
     processedDocumentIds: [],
-    style: 'professional',
-    length: 'medium',
-    audience: 'general',
-    preferredModel: 'claude-4-sonnet',
+    style: "professional",
+    length: "medium",
+    audience: "general",
+    preferredModel: "claude-4-sonnet",
   })
 
   const steps: { id: WizardStep; title: string; description: string }[] = [
     {
-      id: 'goal',
-      title: 'Document Goal',
-      description: 'What do you want to create?',
+      id: "goal",
+      title: "Document Goal",
+      description: "What do you want to create?",
     },
     {
-      id: 'sources',
-      title: 'Source Documents',
-      description: 'Upload reference materials',
+      id: "sources",
+      title: "Source Documents",
+      description: "Upload reference materials",
     },
     {
-      id: 'settings',
-      title: 'Document Settings',
-      description: 'Customize style and format',
+      id: "settings",
+      title: "Document Settings",
+      description: "Customize style and format",
     },
     {
-      id: 'review',
-      title: 'Review & Create',
-      description: 'Confirm your settings',
+      id: "review",
+      title: "Review & Create",
+      description: "Confirm your settings",
     },
   ]
 
-  const currentStepIndex = steps.findIndex(s => s.id === currentStep)
+  const currentStepIndex = steps.findIndex((s) => s.id === currentStep)
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop: async (acceptedFiles: File[]) => {
-      setIsProcessing(true)
       try {
         const processedIds: string[] = []
         const successfulFiles: File[] = []
         const failedFiles: string[] = []
-        
+
         for (const file of acceptedFiles) {
           console.log(`🔄 Uploading file: ${file.name}`)
-          
+
           try {
             // Create form data for file upload
             const formData = new FormData()
-            formData.append('file', file)
-            
+            formData.append("file", file)
+
             // Upload and process the file
-            const response = await fetch('/api/documents/upload', {
-              method: 'POST',
+            const response = await fetch("/api/documents/upload", {
+              method: "POST",
               body: formData,
             })
-            
+
             if (!response.ok) {
               throw new Error(`HTTP ${response.status}: ${response.statusText}`)
             }
-            
+
             const result = await response.json()
             if (result.success) {
               processedIds.push(result.document.id)
               successfulFiles.push(file)
               console.log(`✅ Successfully uploaded: ${file.name} -> ${result.document.id}`)
             } else {
-              throw new Error(result.error || 'Unknown processing error')
+              throw new Error(result.error || "Unknown processing error")
             }
           } catch (fileError) {
             console.error(`❌ Failed to process ${file.name}:`, fileError)
             failedFiles.push(file.name)
           }
         }
-        
+
         // Update state with successful uploads
         if (successfulFiles.length > 0) {
-          setWizardData(prev => ({
+          setWizardData((prev) => ({
             ...prev,
             sources: [...prev.sources, ...successfulFiles],
             processedDocumentIds: [...prev.processedDocumentIds, ...processedIds],
           }))
         }
-        
+
         // Show user feedback
         if (failedFiles.length > 0 && successfulFiles.length > 0) {
-          alert(`Partially successful: ${successfulFiles.length} files uploaded successfully, but ${failedFiles.length} files failed: ${failedFiles.join(', ')}`)
+          alert(
+            `Partially successful: ${successfulFiles.length} files uploaded successfully, but ${failedFiles.length} files failed: ${failedFiles.join(", ")}`
+          )
         } else if (failedFiles.length > 0) {
-          alert(`Upload failed for all files: ${failedFiles.join(', ')}. Please check that the Python PDF service is running and try again.`)
+          alert(
+            `Upload failed for all files: ${failedFiles.join(", ")}. Please check that the Python PDF service is running and try again.`
+          )
         } else {
           console.log(`✅ All ${successfulFiles.length} files uploaded successfully`)
         }
-        
       } catch (error) {
-        console.error('Document processing error:', error)
-        alert(`Failed to process documents: ${error instanceof Error ? error.message : 'Unknown error'}. Please ensure the Python PDF service is running.`)
-      } finally {
-        setIsProcessing(false)
+        console.error("Document processing error:", error)
+        alert(
+          `Failed to process documents: ${error instanceof Error ? error.message : "Unknown error"}. Please ensure the Python PDF service is running.`
+        )
       }
     },
     accept: {
-      'application/pdf': ['.pdf'],
-      'application/msword': ['.doc'],
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
-      'text/plain': ['.txt'],
-      'text/markdown': ['.md'],
+      "application/pdf": [".pdf"],
+      "application/msword": [".doc"],
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [".docx"],
+      "text/plain": [".txt"],
+      "text/markdown": [".md"],
     },
   })
 
+  // Close wizard and reset state when flow starts successfully
+  const resetWizard = () => {
+    setCurrentStep("goal")
+    setWizardData({
+      goal: "",
+      description: "",
+      sources: [],
+      processedDocumentIds: [],
+      style: "professional",
+      length: "medium",
+      audience: "general",
+      preferredModel: "claude-4-sonnet",
+    })
+  }
+
   const canProceed = (): boolean => {
     switch (currentStep) {
-      case 'goal':
+      case "goal":
         return wizardData.goal.length > 10
-      case 'sources':
+      case "sources":
         return wizardData.processedDocumentIds.length > 0
-      case 'settings':
+      case "settings":
         return true
-      case 'review':
+      case "review":
         return wizardData.processedDocumentIds.length > 0
       default:
         return false
@@ -182,7 +205,7 @@ export function DocumentCreationWizard({
   }
 
   const handleNext = () => {
-    const stepOrder: WizardStep[] = ['goal', 'sources', 'settings', 'review']
+    const stepOrder: WizardStep[] = ["goal", "sources", "settings", "review"]
     const currentIndex = stepOrder.indexOf(currentStep)
     if (currentIndex < stepOrder.length - 1) {
       setCurrentStep(stepOrder[currentIndex + 1])
@@ -190,7 +213,7 @@ export function DocumentCreationWizard({
   }
 
   const handleBack = () => {
-    const stepOrder: WizardStep[] = ['goal', 'sources', 'settings', 'review']
+    const stepOrder: WizardStep[] = ["goal", "sources", "settings", "review"]
     const currentIndex = stepOrder.indexOf(currentStep)
     if (currentIndex > 0) {
       setCurrentStep(stepOrder[currentIndex - 1])
@@ -198,70 +221,95 @@ export function DocumentCreationWizard({
   }
 
   const handleCreate = async () => {
-    setIsProcessing(true)
     try {
+      setIsCreatingDocument(true)
+      setError(null)
+
       // Ensure we have documents to work with
       if (wizardData.processedDocumentIds.length === 0) {
-        throw new Error('No documents have been uploaded and processed. Please upload at least one document.')
+        throw new Error(
+          "No documents have been uploaded and processed. Please upload at least one document."
+        )
       }
 
-      // Use the actual agent flow API from Phase 2
+      // Create the agent context
       const context = {
         goal: wizardData.goal,
         documentIds: wizardData.processedDocumentIds,
         style: wizardData.style,
-        preferredModel: wizardData.preferredModel || 'gpt-4o',
+        preferredModel: wizardData.preferredModel || "gpt-4o",
         constraints: [
-          `Target length: ${wizardData.length}`, 
+          `Target length: ${wizardData.length}`,
           `Audience: ${wizardData.audience}`,
-          ...(wizardData.description ? [`Additional context: ${wizardData.description}`] : [])
+          ...(wizardData.description ? [`Additional context: ${wizardData.description}`] : []),
         ],
       }
 
-      console.log('🚀 Starting agent flow with context:', context)
+      console.log("🚀 Wizard: Starting direct flow API call with context:", context)
 
-      // Call the actual agent flow API
-      const response = await fetch('/api/agents/flow', {
-        method: 'POST',
+      // Start the flow via direct API call (no streaming in wizard)
+      const response = await fetch("/api/agents/flow/stream", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(context),
       })
 
       if (!response.ok) {
-        const errorData = await response.text()
-        throw new Error(`Failed to start agent flow: ${response.status} ${errorData}`)
+        throw new Error(`Failed to start flow: ${response.statusText}`)
       }
 
-      const flowResult = await response.json()
-      console.log('🎯 Agent flow started:', flowResult)
+      // Read the first chunk to get the flow ID
+      const reader = response.body?.getReader()
+      const decoder = new TextDecoder()
 
-      // Generate a unique flow ID for monitoring
-      const flowId = `flow_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-      
-      // Close the wizard and start monitoring
-      onOpenChange(false)
-      
-      // Pass the flow ID to the parent for monitoring
-      if (onFlowStart) {
-        onFlowStart(flowId)
+      if (!reader) {
+        throw new Error("No response body available")
       }
 
-      // Store the flow result for later retrieval
-      sessionStorage.setItem(`flow_${flowId}`, JSON.stringify(flowResult))
+      const { value } = await reader.read()
+      const chunk = decoder.decode(value)
 
+      // Parse the first SSE message to get flow ID
+      const lines = chunk.split("\n")
+      for (const line of lines) {
+        if (line.startsWith("data: ")) {
+          try {
+            const data = JSON.parse(line.slice(6))
+            if (data.id) {
+              console.log("🎯 Wizard: Got flow ID, closing wizard and passing to parent:", data.id)
+
+              // Close the reader since parent will handle monitoring
+              reader.cancel()
+
+              // Close wizard immediately
+              onOpenChange(false)
+              resetWizard()
+
+              // Pass flow ID to parent for monitoring
+              onFlowStart?.(data.id)
+
+              return
+            }
+          } catch (parseError) {
+            console.error("Failed to parse initial SSE data:", parseError)
+          }
+        }
+      }
+
+      throw new Error("Failed to get flow ID from initial response")
     } catch (error) {
-      console.error('❌ Document creation error:', error)
-      alert(`Failed to create document: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      console.error("❌ Wizard: Document creation error:", error)
+      setError(error instanceof Error ? error.message : "Unknown error")
     } finally {
-      setIsProcessing(false)
+      setIsCreatingDocument(false)
     }
   }
 
   const renderStepContent = () => {
     switch (currentStep) {
-      case 'goal':
+      case "goal":
         return (
           <div className="space-y-4">
             <div>
@@ -270,7 +318,7 @@ export function DocumentCreationWizard({
                 id="goal"
                 placeholder="e.g., Create a comprehensive guide on machine learning"
                 value={wizardData.goal}
-                onChange={(e) => setWizardData(prev => ({ ...prev, goal: e.target.value }))}
+                onChange={(e) => setWizardData((prev) => ({ ...prev, goal: e.target.value }))}
                 className="mt-1"
               />
             </div>
@@ -280,7 +328,9 @@ export function DocumentCreationWizard({
                 id="description"
                 placeholder="Provide any additional context or specific requirements..."
                 value={wizardData.description}
-                onChange={(e) => setWizardData(prev => ({ ...prev, description: e.target.value }))}
+                onChange={(e) =>
+                  setWizardData((prev) => ({ ...prev, description: e.target.value }))
+                }
                 className="mt-1"
                 rows={4}
               />
@@ -288,28 +338,30 @@ export function DocumentCreationWizard({
           </div>
         )
 
-      case 'sources':
+      case "sources":
         return (
           <div className="space-y-4">
             <div
               {...getRootProps()}
               className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
-                isDragActive ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
+                isDragActive
+                  ? "border-primary bg-primary/5"
+                  : "border-border hover:border-primary/50"
               }`}
             >
               <input {...getInputProps()} />
               <Upload className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
               <p className="text-sm text-muted-foreground">
                 {isDragActive
-                  ? 'Drop the files here...'
-                  : 'Drag & drop files here, or click to select'}
+                  ? "Drop the files here..."
+                  : "Drag & drop files here, or click to select"}
               </p>
               <p className="text-xs text-muted-foreground mt-2">
                 Supports PDF, Word, TXT, and Markdown files
               </p>
             </div>
 
-            {isProcessing && (
+            {isCreatingDocument && (
               <div className="flex items-center justify-center py-4">
                 <Loader2 className="h-6 w-6 animate-spin mr-2" />
                 <span className="text-sm text-muted-foreground">Processing documents...</span>
@@ -333,13 +385,15 @@ export function DocumentCreationWizard({
                         size="sm"
                         variant="ghost"
                         onClick={() => {
-                          setWizardData(prev => ({
+                          setWizardData((prev) => ({
                             ...prev,
                             sources: prev.sources.filter((_, i) => i !== index),
-                            processedDocumentIds: prev.processedDocumentIds.filter((_, i) => i !== index),
+                            processedDocumentIds: prev.processedDocumentIds.filter(
+                              (_, i) => i !== index
+                            ),
                           }))
                         }}
-                        disabled={isProcessing}
+                        disabled={isCreatingDocument}
                       >
                         Remove
                       </Button>
@@ -352,7 +406,8 @@ export function DocumentCreationWizard({
             {wizardData.sources.length === 0 && (
               <div className="text-center py-4">
                 <p className="text-sm text-muted-foreground">
-                  Please upload at least one document to proceed. The AI will use these documents as source material for creating your new document.
+                  Please upload at least one document to proceed. The AI will use these documents as
+                  source material for creating your new document.
                 </p>
               </div>
             )}
@@ -360,21 +415,22 @@ export function DocumentCreationWizard({
             {wizardData.sources.length > 0 && wizardData.processedDocumentIds.length === 0 && (
               <div className="text-center py-4">
                 <p className="text-sm text-orange-600">
-                  Documents are still being processed. Please wait for processing to complete before proceeding.
+                  Documents are still being processed. Please wait for processing to complete before
+                  proceeding.
                 </p>
               </div>
             )}
           </div>
         )
 
-      case 'settings':
+      case "settings":
         return (
           <div className="space-y-4">
             <div>
               <Label htmlFor="style">Writing Style</Label>
               <Select
                 value={wizardData.style}
-                onValueChange={(value) => setWizardData(prev => ({ ...prev, style: value }))}
+                onValueChange={(value) => setWizardData((prev) => ({ ...prev, style: value }))}
               >
                 <SelectTrigger id="style" className="mt-1">
                   <SelectValue />
@@ -393,7 +449,7 @@ export function DocumentCreationWizard({
               <Label htmlFor="length">Document Length</Label>
               <Select
                 value={wizardData.length}
-                onValueChange={(value) => setWizardData(prev => ({ ...prev, length: value }))}
+                onValueChange={(value) => setWizardData((prev) => ({ ...prev, length: value }))}
               >
                 <SelectTrigger id="length" className="mt-1">
                   <SelectValue />
@@ -410,7 +466,7 @@ export function DocumentCreationWizard({
               <Label htmlFor="audience">Target Audience</Label>
               <Select
                 value={wizardData.audience}
-                onValueChange={(value) => setWizardData(prev => ({ ...prev, audience: value }))}
+                onValueChange={(value) => setWizardData((prev) => ({ ...prev, audience: value }))}
               >
                 <SelectTrigger id="audience" className="mt-1">
                   <SelectValue />
@@ -429,22 +485,28 @@ export function DocumentCreationWizard({
               <Label htmlFor="model">Preferred AI Model</Label>
               <Select
                 value={wizardData.preferredModel}
-                onValueChange={(value) => setWizardData(prev => ({ ...prev, preferredModel: value }))}
+                onValueChange={(value) =>
+                  setWizardData((prev) => ({ ...prev, preferredModel: value }))
+                }
               >
                 <SelectTrigger id="model" className="mt-1">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="claude-4-sonnet">Claude 4 Sonnet (Best for writing)</SelectItem>
+                  <SelectItem value="claude-4-sonnet">
+                    Claude 4 Sonnet (Best for writing)
+                  </SelectItem>
                   <SelectItem value="gpt-4.1">GPT-4.1 (Best for analysis)</SelectItem>
-                  <SelectItem value="gemini-2.5-pro">Gemini 2.5 Pro (Best for long context)</SelectItem>
+                  <SelectItem value="gemini-2.5-pro">
+                    Gemini 2.5 Pro (Best for long context)
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
         )
 
-      case 'review':
+      case "review":
         return (
           <div className="space-y-4">
             <div className="space-y-3">
@@ -481,9 +543,9 @@ export function DocumentCreationWizard({
 
             <div className="bg-muted/50 rounded-lg p-4">
               <p className="text-sm text-muted-foreground">
-                The AI will analyze your source documents and create a new document based on your specifications.
-                This process typically takes 1-3 minutes and will use the full content
-                of your documents for accurate, grounded writing.
+                The AI will analyze your source documents and create a new document based on your
+                specifications. This process typically takes 1-3 minutes and will use the full
+                content of your documents for accurate, grounded writing.
               </p>
             </div>
           </div>
@@ -496,20 +558,15 @@ export function DocumentCreationWizard({
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>Create New Document with AI</DialogTitle>
-          <DialogDescription>
-            {steps[currentStepIndex].description}
-          </DialogDescription>
+          <DialogDescription>{steps[currentStepIndex].description}</DialogDescription>
         </DialogHeader>
 
         {/* Progress */}
         <div className="space-y-2">
-          <Progress value={(currentStepIndex + 1) / steps.length * 100} />
+          <Progress value={((currentStepIndex + 1) / steps.length) * 100} />
           <div className="flex justify-between text-xs text-muted-foreground">
             {steps.map((step, index) => (
-              <span
-                key={step.id}
-                className={index <= currentStepIndex ? 'text-foreground' : ''}
-              >
+              <span key={step.id} className={index <= currentStepIndex ? "text-foreground" : ""}>
                 {step.title}
               </span>
             ))}
@@ -518,6 +575,16 @@ export function DocumentCreationWizard({
 
         {/* Step Content */}
         <div className="min-h-[300px] py-4">
+          {/* Show error if there's one from the flow */}
+          {error && (
+            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <div className="flex items-center gap-2 text-red-800">
+                <AlertCircle className="h-4 w-4" />
+                <span className="text-sm font-medium">Document Creation Error</span>
+              </div>
+              <p className="text-sm text-red-700 mt-1">{error}</p>
+            </div>
+          )}
           {renderStepContent()}
         </div>
 
@@ -525,18 +592,15 @@ export function DocumentCreationWizard({
           <Button
             variant="outline"
             onClick={handleBack}
-            disabled={currentStepIndex === 0 || isProcessing}
+            disabled={currentStepIndex === 0 || isCreatingDocument}
           >
             <ChevronLeft className="mr-2 h-4 w-4" />
             Back
           </Button>
 
-          {currentStep === 'review' ? (
-            <Button
-              onClick={handleCreate}
-              disabled={!canProceed() || isProcessing}
-            >
-              {isProcessing ? (
+          {currentStep === "review" ? (
+            <Button onClick={handleCreate} disabled={!canProceed() || isCreatingDocument}>
+              {isCreatingDocument ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Creating...
@@ -549,10 +613,7 @@ export function DocumentCreationWizard({
               )}
             </Button>
           ) : (
-            <Button
-              onClick={handleNext}
-              disabled={!canProceed() || isProcessing}
-            >
+            <Button onClick={handleNext} disabled={!canProceed() || isCreatingDocument}>
               Next
               <ChevronRight className="ml-2 h-4 w-4" />
             </Button>
@@ -561,4 +622,4 @@ export function DocumentCreationWizard({
       </DialogContent>
     </Dialog>
   )
-} 
+}
