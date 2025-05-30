@@ -18,9 +18,8 @@ export class FlowManager {
   private flows: Map<string, FlowState> = new Map()
   private orchestrator = new DocumentCreationOrchestrator()
 
-  // Start a new flow
-  async *startFlow(context: AgentContext): AsyncGenerator<FlowState> {
-    const flowId = uuidv4()
+  // Create an initial flow state (for avoiding race conditions)
+  createInitialFlowState(context: AgentContext, flowId: string): FlowState {
     const flowState: FlowState = {
       id: flowId,
       status: "running",
@@ -31,6 +30,27 @@ export class FlowManager {
     }
 
     this.flows.set(flowId, flowState)
+    return flowState
+  }
+
+  // Start a new flow
+  async *startFlow(context: AgentContext, flowId?: string): AsyncGenerator<FlowState> {
+    const id = flowId || uuidv4()
+
+    // Check if flow already exists (might have been pre-created)
+    let flowState = this.flows.get(id)
+
+    if (!flowState) {
+      flowState = {
+        id,
+        status: "running",
+        progress: 0,
+        results: [],
+        context,
+        startTime: new Date(),
+      }
+      this.flows.set(id, flowState)
+    }
 
     try {
       let stepCount = 0
@@ -48,12 +68,12 @@ export class FlowManager {
           flowState.status = "failed"
           flowState.error = result.error
           flowState.endTime = new Date()
-          this.flows.set(flowId, flowState)
+          this.flows.set(id, flowState)
           yield flowState
           break
         }
 
-        this.flows.set(flowId, flowState)
+        this.flows.set(id, flowState)
         yield flowState
       }
 
@@ -62,14 +82,14 @@ export class FlowManager {
         flowState.status = "completed"
         flowState.progress = 100
         flowState.endTime = new Date()
-        this.flows.set(flowId, flowState)
+        this.flows.set(id, flowState)
         yield flowState
       }
     } catch (error) {
       flowState.status = "failed"
       flowState.error = error instanceof Error ? error.message : "Unknown error"
       flowState.endTime = new Date()
-      this.flows.set(flowId, flowState)
+      this.flows.set(id, flowState)
       yield flowState
     }
   }
@@ -136,8 +156,8 @@ export class FlowManager {
 
     this.flows.set(flowId, flow)
 
-    // Start the flow again
-    for await (const state of this.startFlow(flow.context)) {
+    // Start the flow again with the same ID
+    for await (const state of this.startFlow(flow.context, flowId)) {
       yield state
     }
   }

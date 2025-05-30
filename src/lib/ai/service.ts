@@ -31,9 +31,9 @@ export class AIService {
           { role: "user" as const, content: prompt },
         ],
         temperature,
-        maxTokens: maxTokens || selectedModel.maxTokens,
+        ...(maxTokens && { maxTokens }), // Only set maxTokens if provided
         tools,
-        maxSteps: 5, // Allow multiple tool calls and responses
+        maxSteps: 15, // Allow multiple tool calls and responses
       })
 
       return { text, model, toolCalls, toolResults }
@@ -59,7 +59,7 @@ export class AIService {
           { role: "user" as const, content: prompt },
         ],
         temperature,
-        maxTokens: maxTokens || selectedModel.maxTokens,
+        ...(maxTokens && { maxTokens }), // Only set maxTokens if provided
         tools,
       })
 
@@ -95,12 +95,6 @@ export class AIService {
   estimateTokens(text: string): number {
     // Rough estimation: ~4 characters per token
     return Math.ceil(text.length / 4)
-  }
-
-  // Check if content fits in model context
-  canFitInContext(text: string, model: ModelId): boolean {
-    const tokens = this.estimateTokens(text)
-    return tokens < models[model].contextWindow * 0.8 // Leave 20% buffer
   }
 }
 

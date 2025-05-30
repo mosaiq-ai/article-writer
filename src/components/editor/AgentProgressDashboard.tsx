@@ -87,16 +87,39 @@ export function AgentProgressDashboard({
     const eventSource = new EventSource(`/api/agents/flow/stream?id=${flowId}`)
 
     eventSource.onmessage = (event) => {
-      const state = JSON.parse(event.data) as FlowState
-      setFlowState(state)
+      try {
+        const data = JSON.parse(event.data)
 
-      if (state.status === "completed" && state.results.length > 0) {
-        const finalResult = state.results[state.results.length - 1]
-        const finalDocument =
-          typeof finalResult.output === "object" && finalResult.output
-            ? (finalResult.output as Record<string, unknown>).finalDocument
-            : finalResult.output
-        onComplete?.(finalDocument as Record<string, unknown> | string)
+        // Handle different message types
+        if (data.type === "state" && data.flowState) {
+          const state = data.flowState as FlowState
+          // Ensure results array exists
+          if (!state.results) {
+            state.results = []
+          }
+          setFlowState(state)
+        } else if (data.type === "completed" && data.flowState) {
+          const state = data.flowState as FlowState
+          // Ensure results array exists
+          if (!state.results) {
+            state.results = []
+          }
+          setFlowState(state)
+
+          if (state.results.length > 0) {
+            const finalResult = state.results[state.results.length - 1]
+            const finalDocument =
+              typeof finalResult.output === "object" && finalResult.output
+                ? (finalResult.output as Record<string, unknown>).finalDocument
+                : finalResult.output
+            onComplete?.(finalDocument as Record<string, unknown> | string)
+          } else if (data.finalDocument) {
+            // Use finalDocument from the completed message if available
+            onComplete?.(data.finalDocument)
+          }
+        }
+      } catch (error) {
+        console.error("Failed to parse SSE message:", error)
       }
     }
 
@@ -150,12 +173,14 @@ export function AgentProgressDashboard({
   }
 
   const getAgentStatus = (agentName: string) => {
+    if (!flowState.results || !Array.isArray(flowState.results)) return "pending"
     const result = flowState.results.find((r) => r.agentName === agentName)
     if (!result) return "pending"
     return result.status
   }
 
   const getAgentResult = (agentName: string) => {
+    if (!flowState.results || !Array.isArray(flowState.results)) return undefined
     return flowState.results.find((r) => r.agentName === agentName)
   }
 
@@ -215,12 +240,12 @@ export function AgentProgressDashboard({
                 </span>
               )}
             </div>
-            {flowState.endTime && (
+            {flowState.endTime && flowState.startTime && (
               <span className="text-muted-foreground">
                 Completed in{" "}
                 {Math.round(
                   (new Date(flowState.endTime).getTime() -
-                    new Date(flowState.startTime!).getTime()) /
+                    new Date(flowState.startTime).getTime()) /
                     1000
                 )}
                 s
@@ -361,9 +386,11 @@ export function AgentProgressDashboard({
               <Button
                 className="flex-1"
                 onClick={() => {
-                  const finalResult = flowState.results[flowState.results.length - 1]
-                  if (finalResult?.output) {
-                    onComplete?.(finalResult.output)
+                  if (flowState.results && flowState.results.length > 0) {
+                    const finalResult = flowState.results[flowState.results.length - 1]
+                    if (finalResult?.output) {
+                      onComplete?.(finalResult.output)
+                    }
                   }
                 }}
               >

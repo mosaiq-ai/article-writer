@@ -1,9 +1,7 @@
-import { FlowManager } from "@/lib/agents/flow-manager"
+import { flowManager } from "./stream/route"
 import type { AgentContext } from "@/lib/agents/types"
 import type { NextRequest } from "next/server"
 import { NextResponse } from "next/server"
-
-const flowManager = new FlowManager()
 
 export async function POST(request: NextRequest) {
   try {
@@ -21,80 +19,35 @@ export async function POST(request: NextRequest) {
     console.log("🚀 Starting agent flow with context:", {
       goal: context.goal,
       documentIds: context.documentIds,
+      sessionId: context.sessionId,
       style: context.style,
       preferredModel: context.preferredModel,
     })
 
-    // Create a streaming response for Server-Sent Events
-    const encoder = new TextEncoder()
+    // Generate a flow ID
+    const flowId = `flow-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 
-    const stream = new ReadableStream({
-      async start(controller) {
-        try {
-          // Send initial event
-          const initialEvent = `data: ${JSON.stringify({
-            type: "started",
-            progress: 0,
-            message: "Starting agent flow...",
-          })}\n\n`
-          controller.enqueue(encoder.encode(initialEvent))
+    // Create an initial flow state immediately to avoid race condition with SSE endpoint
+    flowManager.createInitialFlowState(context, flowId)
 
-          // Stream progress updates
-          for await (const flowState of flowManager.startFlow(context)) {
-            const progressEvent = `data: ${JSON.stringify({
-              type: "progress",
-              progress: Math.round(flowState.progress),
-              currentAgent: flowState.currentAgent,
-              status: flowState.status,
-              message: `Progress: ${Math.round(flowState.progress)}% - ${flowState.currentAgent || "Processing..."}`,
-            })}\n\n`
-            controller.enqueue(encoder.encode(progressEvent))
-
-            // If completed or failed, send final event with result
-            if (flowState.status === "completed" || flowState.status === "failed") {
-              const finalEvent = `data: ${JSON.stringify({
-                type: "completed",
-                status: flowState.status,
-                progress: 100,
-                flowState: flowState,
-                finalDocument:
-                  flowState.status === "completed"
-                    ? flowManager.getFinalDocument(flowState.id)
-                    : null,
-                message:
-                  flowState.status === "completed"
-                    ? "Document created successfully!"
-                    : "Flow failed",
-              })}\n\n`
-              controller.enqueue(encoder.encode(finalEvent))
-              break
-            }
-          }
-
-          // Close the stream
-          controller.close()
-        } catch (error) {
-          console.error("❌ Agent flow error:", error)
-          const errorEvent = `data: ${JSON.stringify({
-            type: "error",
-            error: error instanceof Error ? error.message : "Unknown error",
-            details: error instanceof Error ? error.stack : undefined,
-          })}\n\n`
-          controller.enqueue(encoder.encode(errorEvent))
-          controller.close()
+    // Start the flow asynchronously
+    setTimeout(async () => {
+      try {
+        // Consume the flow generator to keep it running
+        // Flow states are automatically stored in the flow manager
+        for await (const flowState of flowManager.startFlow(context, flowId)) {
+          void flowState // Explicitly ignore the value - states are stored in flow manager
         }
-      },
-    })
+      } catch (error) {
+        console.error("❌ Agent flow error:", error)
+      }
+    }, 0)
 
-    return new NextResponse(stream, {
-      headers: {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
-        Connection: "keep-alive",
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "POST",
-        "Access-Control-Allow-Headers": "Content-Type",
-      },
+    // Return the flow ID immediately so the client can connect to the stream
+    return NextResponse.json({
+      success: true,
+      flowId,
+      streamUrl: `/api/agents/flow/stream?id=${flowId}`,
     })
   } catch (error) {
     console.error("❌ Agent flow setup error:", error)

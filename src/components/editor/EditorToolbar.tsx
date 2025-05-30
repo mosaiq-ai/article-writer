@@ -1,31 +1,47 @@
-'use client'
+"use client"
 
-import { Editor } from '@tiptap/react'
-import { Button } from '@/components/ui/button'
-import { Separator } from '@/components/ui/separator'
+import { Editor } from "@tiptap/react"
+import { Button } from "@/components/ui/button"
+import { Separator } from "@/components/ui/separator"
 import {
-  Bold, Italic, Strikethrough,
-  List, ListOrdered, Quote,
-  Code, CodeSquare,
-  Undo, Redo,
+  Bold,
+  Italic,
+  Strikethrough,
+  List,
+  ListOrdered,
+  Quote,
+  Code,
+  CodeSquare,
+  Undo,
+  Redo,
   Table,
-} from 'lucide-react'
+} from "lucide-react"
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select'
-import { AIToolbar } from './AIToolbar'
+} from "@/components/ui/select"
+import { AIToolbar } from "./AIToolbar"
 
 interface EditorToolbarProps {
   editor: Editor
+  onSearchDocuments?: () => void
+  onGenerateContent?: () => void
 }
 
-export function EditorToolbar({ editor }: EditorToolbarProps) {
+export function EditorToolbar({
+  editor,
+  onSearchDocuments,
+  onGenerateContent,
+}: EditorToolbarProps) {
   const setHeading = (level: number) => {
-    editor.chain().focus().toggleHeading({ level: level as 1 | 2 | 3 | 4 | 5 | 6 }).run()
+    editor
+      .chain()
+      .focus()
+      .toggleHeading({ level: level as 1 | 2 | 3 | 4 | 5 | 6 })
+      .run()
   }
 
   const addTable = () => {
@@ -36,8 +52,12 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
     <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="flex items-center gap-1 p-2 flex-wrap">
         {/* AI Tools */}
-        <AIToolbar editor={editor} />
-        
+        <AIToolbar
+          editor={editor}
+          onSearchDocuments={onSearchDocuments}
+          onGenerateContent={onGenerateContent}
+        />
+
         <Separator orientation="vertical" className="h-6" />
 
         {/* Text Style */}
@@ -45,7 +65,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
           variant="ghost"
           size="sm"
           onClick={() => editor.chain().focus().toggleBold().run()}
-          className={editor.isActive('bold') ? 'bg-muted' : ''}
+          className={editor.isActive("bold") ? "bg-muted" : ""}
         >
           <Bold className="h-4 w-4" />
         </Button>
@@ -53,7 +73,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
           variant="ghost"
           size="sm"
           onClick={() => editor.chain().focus().toggleItalic().run()}
-          className={editor.isActive('italic') ? 'bg-muted' : ''}
+          className={editor.isActive("italic") ? "bg-muted" : ""}
         >
           <Italic className="h-4 w-4" />
         </Button>
@@ -61,7 +81,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
           variant="ghost"
           size="sm"
           onClick={() => editor.chain().focus().toggleStrike().run()}
-          className={editor.isActive('strike') ? 'bg-muted' : ''}
+          className={editor.isActive("strike") ? "bg-muted" : ""}
         >
           <Strikethrough className="h-4 w-4" />
         </Button>
@@ -69,7 +89,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
           variant="ghost"
           size="sm"
           onClick={() => editor.chain().focus().toggleCode().run()}
-          className={editor.isActive('code') ? 'bg-muted' : ''}
+          className={editor.isActive("code") ? "bg-muted" : ""}
         >
           <Code className="h-4 w-4" />
         </Button>
@@ -79,13 +99,16 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
         {/* Headings */}
         <Select
           value={
-            editor.isActive('heading', { level: 1 }) ? '1' :
-            editor.isActive('heading', { level: 2 }) ? '2' :
-            editor.isActive('heading', { level: 3 }) ? '3' :
-            'paragraph'
+            editor.isActive("heading", { level: 1 })
+              ? "1"
+              : editor.isActive("heading", { level: 2 })
+                ? "2"
+                : editor.isActive("heading", { level: 3 })
+                  ? "3"
+                  : "paragraph"
           }
           onValueChange={(value) => {
-            if (value === 'paragraph') {
+            if (value === "paragraph") {
               editor.chain().focus().setParagraph().run()
             } else {
               setHeading(parseInt(value))
@@ -110,7 +133,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
           variant="ghost"
           size="sm"
           onClick={() => editor.chain().focus().toggleBulletList().run()}
-          className={editor.isActive('bulletList') ? 'bg-muted' : ''}
+          className={editor.isActive("bulletList") ? "bg-muted" : ""}
         >
           <List className="h-4 w-4" />
         </Button>
@@ -118,7 +141,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
           variant="ghost"
           size="sm"
           onClick={() => editor.chain().focus().toggleOrderedList().run()}
-          className={editor.isActive('orderedList') ? 'bg-muted' : ''}
+          className={editor.isActive("orderedList") ? "bg-muted" : ""}
         >
           <ListOrdered className="h-4 w-4" />
         </Button>
@@ -126,7 +149,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
           variant="ghost"
           size="sm"
           onClick={() => editor.chain().focus().toggleBlockquote().run()}
-          className={editor.isActive('blockquote') ? 'bg-muted' : ''}
+          className={editor.isActive("blockquote") ? "bg-muted" : ""}
         >
           <Quote className="h-4 w-4" />
         </Button>
@@ -134,7 +157,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
           variant="ghost"
           size="sm"
           onClick={() => editor.chain().focus().toggleCodeBlock().run()}
-          className={editor.isActive('codeBlock') ? 'bg-muted' : ''}
+          className={editor.isActive("codeBlock") ? "bg-muted" : ""}
         >
           <CodeSquare className="h-4 w-4" />
         </Button>
@@ -142,11 +165,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
         <Separator orientation="vertical" className="h-6" />
 
         {/* Table */}
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={addTable}
-        >
+        <Button variant="ghost" size="sm" onClick={addTable}>
           <Table className="h-4 w-4" />
         </Button>
 
@@ -172,4 +191,4 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
       </div>
     </div>
   )
-} 
+}

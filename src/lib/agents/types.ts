@@ -1,6 +1,7 @@
 export interface AgentContext {
   goal: string
   documentIds: string[]
+  sessionId?: string
   style?: string
   constraints?: string[]
   previousResults?: Record<string, unknown>
@@ -18,7 +19,7 @@ export interface AgentResult {
     documentsAccessed: string[]
     toolCalls?: Record<string, unknown>[]
   }
-  status: 'success' | 'error' | 'partial'
+  status: "success" | "error" | "partial"
   error?: string
 }
 
@@ -31,4 +32,4 @@ export interface Agent {
 export interface AgentOrchestrator {
   registerAgent(agent: Agent): void
   executeFlow(context: AgentContext): AsyncGenerator<AgentResult>
-} 
+}

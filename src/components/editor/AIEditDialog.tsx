@@ -1,255 +1,304 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Editor } from "@tiptap/react"
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Loader2, Sparkles, Copy, Check } from "lucide-react"
-import { AISelectionHandler } from "@/lib/editor/ai-selection"
-import { useToast } from "@/components/ui/use-toast"
-
-interface Selection {
-  text: string
-  from: number
-  to: number
-  isEmpty?: boolean
-  context?: {
-    before: string
-    after: string
-  }
-}
+import { Badge } from "@/components/ui/badge"
+import { Loader2, FileText, CheckCircle } from "lucide-react"
+import { SelectionInfo } from "@/lib/editor/ai-editor-service"
+import { useDocumentSession } from "@/contexts/DocumentSessionContext"
 
 interface AIEditDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  editor: Editor
-  selection: Selection | null
   action: string
+  selection: SelectionInfo | null
+  result: string | null
+  isLoading: boolean
+  sourcesUsed?: string[]
+  onApply: (text: string) => void
+  onRegenerate: (customPrompt?: string, selectedSources?: string[]) => void
 }
 
-export function AIEditDialog({ open, onOpenChange, editor, selection, action }: AIEditDialogProps) {
-  const [customPrompt, setCustomPrompt] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
-  const [result, setResult] = useState("")
-  const [copied, setCopied] = useState(false)
-  const { toast } = useToast()
+export function AIEditDialog({
+  open,
+  onOpenChange,
+  action,
+  selection,
+  result,
+  isLoading,
+  sourcesUsed = [],
+  onApply,
+  onRegenerate,
+}: AIEditDialogProps) {
+  const [instruction, setInstruction] = useState("")
+  const [selectedSources, setSelectedSources] = useState<string[]>([])
+  const [documentTitles, setDocumentTitles] = useState<Record<string, string>>({})
+  const { getSessionDocuments, getDocumentTitles } = useDocumentSession()
 
-  const aiHandler = new AISelectionHandler(editor)
+  // Reset local state when dialog opens with a new action
+  useEffect(() => {
+    if (open) {
+      setInstruction("")
+      setSelectedSources([])
+
+      // Fetch document titles when dialog opens
+      getDocumentTitles()
+        .then((titles) => {
+          setDocumentTitles(titles)
+        })
+        .catch((error) => {
+          console.error("Failed to fetch document titles:", error)
+          setDocumentTitles({})
+        })
+    }
+  }, [open, action, getDocumentTitles])
+
+  const getActionLabel = (action: string): string => {
+    const labels: Record<string, string> = {
+      improve: "Improve Text",
+      fix: "Fix Grammar",
+      simplify: "Simplify",
+      expand: "Expand",
+      shorten: "Make Concise",
+      summarize: "Summarize",
+      custom: "Custom Edit",
+      add_from_sources: "Add from Sources",
+      verify_against_sources: "Verify with Sources",
+      expand_with_sources: "Expand with Sources",
+      cite_sources: "Add Citations",
+      "tone:professional": "Professional Tone",
+      "tone:casual": "Casual Tone",
+      "tone:formal": "Formal Tone",
+      "tone:friendly": "Friendly Tone",
+      "tone:confident": "Confident Tone",
+      "tone:diplomatic": "Diplomatic Tone",
+    }
+    return labels[action] || action
+  }
+
+  const isDocumentAwareAction = (action: string): boolean => {
+    return [
+      "add_from_sources",
+      "verify_against_sources",
+      "expand_with_sources",
+      "cite_sources",
+    ].includes(action.split(":")[0])
+  }
+
+  const needsCustomInstructions = (): boolean => {
+    return action === "custom" || isDocumentAwareAction(action)
+  }
+
+  const getInstructionPlaceholder = (): string => {
+    if (action === "custom") {
+      return "Describe what you want to do with the selected text..."
+    }
+
+    const placeholders: Record<string, string> = {
+      add_from_sources:
+        "e.g., Add technical specifications, focus on financial data, include recent statistics...",
+      verify_against_sources:
+        "e.g., Check the dates mentioned, verify the statistics, confirm the methodology...",
+      expand_with_sources:
+        "e.g., Add more examples, include supporting evidence, elaborate on the technical details...",
+      cite_sources: "e.g., Use APA format, focus on peer-reviewed sources, include page numbers...",
+    }
+
+    return placeholders[action] || "Provide specific instructions for this action..."
+  }
+
+  const availableSources = getSessionDocuments()
 
   const generateAIEdit = async () => {
-    if (!selection || selection.isEmpty) return
+    const customPrompt = instruction.trim() || undefined
+    const sources =
+      isDocumentAwareAction(action) && selectedSources.length > 0 ? selectedSources : undefined
 
-    setIsLoading(true)
-    try {
-      buildPrompt(action, customPrompt, selection)
-
-      // For now, simulate AI response - in real implementation, this would call the AI service
-      await new Promise((resolve) => setTimeout(resolve, 2000))
-
-      // Mock AI response based on action
-      const mockResponse = generateMockResponse(action, selection.text)
-      setResult(mockResponse)
-    } catch (err) {
-      console.error("AI edit error:", err)
-      toast({
-        title: "Error",
-        description: "Failed to generate AI edit. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    if (open && action) {
-      generateAIEdit()
-    }
-  }, [open, action])
-
-  const generateMockResponse = (action: string, text: string): string => {
-    switch (action) {
-      case "improve":
-        return text.replace(/\b\w+/g, (word) => (word.length > 3 ? word + " (enhanced)" : word))
-      case "fix":
-        return text.replace(/\bi\b/g, "I").replace(/\bdont\b/g, "don't")
-      case "simplify":
-        return text.replace(/\b\w{8,}\b/g, "simple")
-      case "expand":
-        return text + " This is an expanded version with additional context and details."
-      case "shorten":
-        return text
-          .split(" ")
-          .slice(0, Math.ceil(text.split(" ").length / 2))
-          .join(" ")
-      case "summarize":
-        return "Summary: " + text.split(" ").slice(0, 10).join(" ") + "..."
-      default:
-        if (action.startsWith("tone:")) {
-          const tone = action.split(":")[1]
-          return `[${tone.toUpperCase()} TONE] ${text}`
-        }
-        if (action.startsWith("translate:")) {
-          const language = action.split(":")[1]
-          return `[TRANSLATED TO ${language.toUpperCase()}] ${text}`
-        }
-        return text
-    }
-  }
-
-  const buildPrompt = (action: string, customInstruction: string, selection: Selection): string => {
-    const basePrompt = `Edit the following text according to the instruction.
-
-Original text: "${selection.text}"
-
-Context before: "${selection.context?.before}"
-Context after: "${selection.context?.after}"
-
-`
-
-    const actionPrompts: Record<string, string> = {
-      improve:
-        "Improve the writing quality, clarity, and flow while maintaining the original meaning.",
-      fix: "Fix all grammar, spelling, and punctuation errors.",
-      simplify: "Simplify the language to make it easier to understand.",
-      expand:
-        "Expand this text with more detail and explanation while keeping the same key points.",
-      shorten: "Make this text more concise while preserving the essential information.",
-      summarize: "Summarize the key points in a brief, clear manner.",
-    }
-
-    if (action.startsWith("tone:")) {
-      const tone = action.split(":")[1]
-      return basePrompt + `Change the tone to be more ${tone}.`
-    }
-
-    if (action.startsWith("translate:")) {
-      const language = action.split(":")[1]
-      return basePrompt + `Translate to ${language}.`
-    }
-
-    if (action === "custom") {
-      return basePrompt + `Instruction: ${customInstruction}`
-    }
-
-    return basePrompt + (actionPrompts[action] || "Improve the text.")
+    await onRegenerate(customPrompt, sources)
   }
 
   const applyEdit = () => {
-    if (result) {
-      aiHandler.replaceSelection(result)
-      onOpenChange(false)
-      toast({
-        title: "Applied",
-        description: "AI edit has been applied to your document.",
-      })
+    onApply(result || "")
+  }
+
+  const handleSourceToggle = (documentId: string, checked: boolean) => {
+    if (checked) {
+      setSelectedSources((prev) => [...prev, documentId])
+    } else {
+      setSelectedSources((prev) => prev.filter((id) => id !== documentId))
     }
   }
 
-  const copyResult = () => {
-    navigator.clipboard.writeText(result)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+  const selectAllSources = () => {
+    setSelectedSources(availableSources)
   }
 
-  const regenerate = () => {
-    generateAIEdit()
+  const clearSourceSelection = () => {
+    setSelectedSources([])
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5" />
-            AI Text Editor
+            {isDocumentAwareAction(action) && <FileText className="h-5 w-5 text-blue-600" />}
+            {getActionLabel(action)}
           </DialogTitle>
-          <DialogDescription>
-            {action === "custom"
-              ? "Provide instructions for how you want to edit the selected text."
-              : `AI will ${action.replace(":", " to ")} your selected text.`}
-          </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
-          {/* Original Text */}
-          <div>
-            <Label>Selected Text</Label>
-            <div className="mt-1 p-3 bg-muted rounded-md text-sm">
-              {selection?.text || "No text selected"}
-            </div>
-          </div>
+        <div className="flex-1 overflow-hidden">
+          {needsCustomInstructions() && !result ? (
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="instruction">
+                  {action === "custom"
+                    ? "Custom Instruction"
+                    : "Additional Instructions (Optional)"}
+                </Label>
+                <Textarea
+                  id="instruction"
+                  placeholder={getInstructionPlaceholder()}
+                  value={instruction}
+                  onChange={(e) => setInstruction(e.target.value)}
+                  className="mt-1"
+                  rows={4}
+                />
+              </div>
 
-          {/* Custom Instruction Input */}
-          {action === "custom" && (
-            <div>
-              <Label htmlFor="instruction">Instructions</Label>
-              <Textarea
-                id="instruction"
-                placeholder="E.g., Make this more persuasive, add examples, change to past tense..."
-                value={customPrompt}
-                onChange={(e) => setCustomPrompt(e.target.value)}
-                className="mt-1"
-                rows={3}
-              />
+              {/* Source Selection for Document-Aware Actions */}
+              {isDocumentAwareAction(action) && availableSources.length > 0 && (
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <Label>Select Source Documents</Label>
+                    <div className="flex gap-2">
+                      <Button type="button" variant="outline" size="sm" onClick={selectAllSources}>
+                        Select All
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={clearSourceSelection}
+                      >
+                        Clear
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="max-h-32 overflow-y-auto border rounded-md p-3 space-y-2">
+                    {availableSources.map((docId) => (
+                      <div key={docId} className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          id={docId}
+                          checked={selectedSources.includes(docId)}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                            handleSourceToggle(docId, e.target.checked)
+                          }
+                          className="h-4 w-4 rounded border border-gray-300 text-blue-600 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                        />
+                        <label
+                          htmlFor={docId}
+                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                        >
+                          {documentTitles[docId] || docId}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {selectedSources.length === 0
+                      ? "Select specific documents or leave empty to search all sources"
+                      : `${selectedSources.length} document${selectedSources.length > 1 ? "s" : ""} selected`}
+                  </p>
+                </div>
+              )}
             </div>
-          )}
-
-          {/* Results */}
-          {(result || isLoading) && (
-            <Tabs defaultValue="result" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
+          ) : (
+            <Tabs defaultValue="result" className="h-full flex flex-col">
+              <TabsList>
                 <TabsTrigger value="result">Result</TabsTrigger>
                 <TabsTrigger value="diff">Compare</TabsTrigger>
+                {sourcesUsed.length > 0 && <TabsTrigger value="sources">Sources Used</TabsTrigger>}
               </TabsList>
 
-              <TabsContent value="result" className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <Label>AI Edit</Label>
-                  <div className="flex gap-2">
-                    <Button size="sm" variant="ghost" onClick={copyResult} disabled={!result}>
-                      {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={regenerate} disabled={isLoading}>
-                      Regenerate
-                    </Button>
+              <div className="flex-1 overflow-auto mt-4">
+                <TabsContent value="result" className="space-y-4 h-full">
+                  <div className="flex items-center gap-2">
+                    <Label>AI Generated Result</Label>
+                    {isDocumentAwareAction(action) && sourcesUsed.length > 0 && (
+                      <Badge variant="secondary" className="text-xs">
+                        <CheckCircle className="h-3 w-3 mr-1" />
+                        {sourcesUsed.length} source{sourcesUsed.length > 1 ? "s" : ""} used
+                      </Badge>
+                    )}
                   </div>
-                </div>
-                <div className="p-3 bg-muted rounded-md min-h-[100px]">
+
                   {isLoading ? (
-                    <div className="flex items-center justify-center h-24">
-                      <Loader2 className="h-6 w-6 animate-spin" />
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                      <span className="text-sm text-muted-foreground">
+                        {isDocumentAwareAction(action)
+                          ? "Analyzing source documents..."
+                          : "Generating..."}
+                      </span>
                     </div>
                   ) : (
-                    <div className="text-sm whitespace-pre-wrap">{result}</div>
+                    <div className="mt-1 p-3 bg-green-50 dark:bg-green-950 rounded-md text-sm max-h-64 overflow-auto">
+                      {result || "No result yet..."}
+                    </div>
                   )}
-                </div>
-              </TabsContent>
+                </TabsContent>
 
-              <TabsContent value="diff" className="space-y-4">
-                <div>
-                  <Label>Original</Label>
-                  <div className="mt-1 p-3 bg-red-50 dark:bg-red-950 rounded-md text-sm">
-                    {selection?.text}
+                <TabsContent value="diff" className="space-y-4">
+                  <div>
+                    <Label>Original</Label>
+                    <div className="mt-1 p-3 bg-red-50 dark:bg-red-950 rounded-md text-sm max-h-32 overflow-auto">
+                      {selection?.text}
+                    </div>
                   </div>
-                </div>
-                <div>
-                  <Label>Edited</Label>
-                  <div className="mt-1 p-3 bg-green-50 dark:bg-green-950 rounded-md text-sm">
-                    {result || "..."}
+                  <div>
+                    <Label>Edited</Label>
+                    <div className="mt-1 p-3 bg-green-50 dark:bg-green-950 rounded-md text-sm max-h-32 overflow-auto">
+                      {result || "..."}
+                    </div>
                   </div>
-                </div>
-              </TabsContent>
+                </TabsContent>
+
+                {sourcesUsed.length > 0 && (
+                  <TabsContent value="sources" className="space-y-4">
+                    <div>
+                      <Label>Source Documents Referenced</Label>
+                      <div className="mt-2 space-y-2">
+                        {sourcesUsed.map((sourceId, index) => (
+                          <div
+                            key={index}
+                            className="flex items-center gap-2 p-2 bg-blue-50 dark:bg-blue-950 rounded-md"
+                          >
+                            <FileText className="h-4 w-4 text-blue-600" />
+                            <span className="text-sm font-medium">
+                              {documentTitles[sourceId] || sourceId}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        The AI used information from these source documents to enhance your text.
+                      </p>
+                    </div>
+                  </TabsContent>
+                )}
+              </div>
             </Tabs>
           )}
         </div>
@@ -258,15 +307,24 @@ Context after: "${selection.context?.after}"
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          {action === "custom" && !result ? (
-            <Button onClick={generateAIEdit} disabled={!customPrompt || isLoading}>
+          {needsCustomInstructions() && !result ? (
+            <Button
+              onClick={generateAIEdit}
+              disabled={(action === "custom" && !instruction) || isLoading}
+            >
               {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Generate
             </Button>
           ) : (
-            <Button onClick={applyEdit} disabled={!result || isLoading}>
-              Apply Edit
-            </Button>
+            <>
+              <Button variant="outline" onClick={generateAIEdit} disabled={isLoading}>
+                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Regenerate
+              </Button>
+              <Button onClick={applyEdit} disabled={!result || isLoading}>
+                Apply Edit
+              </Button>
+            </>
           )}
         </DialogFooter>
       </DialogContent>
