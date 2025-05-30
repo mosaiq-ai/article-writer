@@ -1,5 +1,5 @@
-import { streamText, generateText, CoreTool } from "ai"
-import { models, ModelId } from "./providers"
+import { CoreTool, generateText, streamText } from "ai"
+import { ModelId, models } from "./providers"
 
 export interface AIServiceOptions {
   model?: ModelId
@@ -16,7 +16,7 @@ export interface AIGenerateResult {
   toolResults?: unknown[]
 }
 
-export class AIService {
+class AIService {
   private defaultModel: ModelId = "gpt-4.1" // Default to GPT-4.1 for reliable access
 
   async generateText(prompt: string, options: AIServiceOptions = {}): Promise<AIGenerateResult> {

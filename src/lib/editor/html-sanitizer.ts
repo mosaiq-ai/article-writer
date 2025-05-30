@@ -7,7 +7,7 @@
  * Sanitize HTML content by removing dangerous tags and attributes
  * while preserving formatting tags safe for rich text editing
  */
-export function sanitizeHtml(html: string): string {
+function sanitizeHtml(html: string): string {
   // Remove script tags and their content
   html = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
 

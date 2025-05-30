@@ -1,14 +1,14 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
-import { Sparkles, Wand2, Brain, FileSearch, Loader2 } from "lucide-react"
-import { useState } from "react"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Textarea } from "@/components/ui/textarea"
 import { Editor } from "@tiptap/react"
-import { useToast } from "@/components/ui/use-toast"
+import { Brain, FileSearch, Loader2, Sparkles, Wand2 } from "lucide-react"
+import { useState } from "react"
+import { toast } from "sonner"
 
 interface AIToolbarProps {
   editor: Editor
@@ -21,7 +21,6 @@ export function AIToolbar({ editor, onSearchDocuments, onGenerateContent }: AITo
   const [showAskDialog, setShowAskDialog] = useState(false)
   const [askPrompt, setAskPrompt] = useState("")
   const [isAsking, setIsAsking] = useState(false)
-  const { toast } = useToast()
 
   const handleAskAI = async () => {
     if (!askPrompt.trim()) return
@@ -53,8 +52,7 @@ export function AIToolbar({ editor, onSearchDocuments, onGenerateContent }: AITo
       const data = await response.json()
 
       // Show result in a toast or insert at cursor
-      toast({
-        title: "AI Assistant",
+      toast.success("AI Assistant", {
         description: data.result.text.slice(0, 200) + (data.result.text.length > 200 ? "..." : ""),
       })
 
@@ -65,11 +63,9 @@ export function AIToolbar({ editor, onSearchDocuments, onGenerateContent }: AITo
       setAskPrompt("")
     } catch (error) {
       console.error("Ask AI error:", error)
-      toast({
-        title: "Error",
+      toast.error("Error", {
         description:
           error instanceof Error ? error.message : "Failed to get AI response. Please try again.",
-        variant: "destructive",
       })
     } finally {
       setIsAsking(false)

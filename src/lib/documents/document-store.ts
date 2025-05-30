@@ -8,7 +8,7 @@ const globalForDocuments = globalThis as unknown as {
   documentStore: DocumentStore | undefined
 }
 
-export class DocumentStore {
+class DocumentStore {
   private documents: Map<string, StoredDocument> = new Map()
   private initialized = false
 
